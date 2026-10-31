@@ -1,0 +1,64 @@
+services:
+  gitea:
+    image: gitea/gitea:1.22.6
+    environment:
+      - USER_UID=1000
+      - USER_GID=1000
+      - GITEA__database__DB_TYPE=sqlite3
+      # One URL for everyone: CI job containers resolve `gitea` on the network, the host via /etc/hosts.
+      - GITEA__server__ROOT_URL=http://gitea:3000/
+      - GITEA__server__SSH_DOMAIN=gitea
+      - GITEA__server__SSH_PORT=2222
+      - GITEA__actions__ENABLED=true
+      - GITEA__security__INSTALL_LOCK=true # no web wizard: the admin is created from the CLI (README)
+    ports:
+      - "3000:3000"
+      - "2222:22"
+    volumes:
+      - gitea-data:/data
+    networks: [forge]
+
+  orchestrator:
+    build: ./orchestrator
+    env_file: .env
+    depends_on: [gitea]
+    ports:
+      - "8000:8000"
+    volumes:
+      # The Docker socket is root on the host, :ro or not (see AGENT.md, Security).
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./secrets/deploy_key:/run/secrets/deploy_key:ro
+    security_opt:
+      - label=disable # SELinux (Fedora) blocks socket access otherwise
+    networks: [forge]
+
+  # Gitea Actions runner: runs the target repo's CI in throwaway containers on the forge network.
+  runner:
+    image: gitea/act_runner:0.2.11
+    environment:
+      - CONFIG_FILE=/config.yaml
+      - GITEA_INSTANCE_URL=http://gitea:3000
+      - GITEA_RUNNER_REGISTRATION_TOKEN=${GITEA_RUNNER_REGISTRATION_TOKEN}
+      - GITEA_RUNNER_NAME=forge-runner
+    depends_on: [gitea]
+    volumes:
+      - ./runner/config.yaml:/config.yaml:ro
+      - runner-data:/data
+      - /var/run/docker.sock:/var/run/docker.sock
+    security_opt:
+      - label=disable
+    networks: [forge]
+
+  # Image only: the orchestrator starts one container per US. Build with `docker compose build agent`.
+  agent:
+    build: ./agents
+    image: forge-agent
+    profiles: [agent]
+
+networks:
+  forge:
+    name: forge # fixed name so the orchestrator can attach agent containers to it
+
+volumes:
+  gitea-data:
+  runner-data:

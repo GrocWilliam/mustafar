@@ -1,0 +1,10 @@
+# act_runner settings; unset keys keep act_runner's defaults.
+runner:
+  capacity: 2 # keep >= MAX_AGENTS, or parallel stories queue for CI
+  labels:
+    - "ubuntu-latest:docker://node:20-bookworm"
+container:
+  # Job containers join the compose network to reach http://gitea:3000.
+  network: forge
+  # "-" = never mount the Docker socket into jobs: CI runs agent-written code, which must not get root on the host.
+  docker_host: "-"

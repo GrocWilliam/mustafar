@@ -1,0 +1,24 @@
+# Copy to `.gitea/workflows/ci.yml` in the target repo. Agents cannot change it: `.gitea/` is a protected path.
+name: ci
+on:
+  pull_request:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: make test
+  # Run from here, not from the dev's Makefile, so the dev cannot drop them from CI; in a job of its own, from a fresh
+  # checkout, so `make test` cannot rewrite them on disk before they run.
+  acceptance:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: acceptance tests (frozen, written by the tester agent)
+        run: |
+          for script in tests/acceptance/*/run.sh; do
+            [ -e "$script" ] || continue
+            echo "== $script"
+            bash "$script"
+          done
