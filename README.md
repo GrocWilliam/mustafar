@@ -1,7 +1,32 @@
-# Forge — setup (M6)
+# Forge
 
-A `spec` issue is planned into `us-todo` stories with dependencies. Each story gets acceptance tests (tester), an implementation (dev, up to 3 attempts), CI and a review; once approved, the PR is squash-merged and the issue closed.
-See `AGENT.md` for the design.
+A local, autonomous software forge. You write a spec as a Gitea issue; headless Claude Code agents plan it into stories, write the acceptance tests, implement, and review. The orchestrator merges and deploys to staging on its own, following fixed rules: green CI + reviewer approval → merge; failed health check → revert.
+
+Everything runs on one machine with Docker Compose, and every step is logged as a comment on the Gitea issue. One forge serves many projects. The design is in [`AGENT.md`](AGENT.md).
+
+## How it works
+
+```
+spec issue ──planner──▶ us-todo stories (with dependencies)
+                          │
+                          ▼
+              tester ─▶ dev ─▶ CI ─▶ reviewer ─▶ squash-merge ─▶ staging deploy
+                         ▲      │        │                          │
+                         └──────┴────────┘                   /health fails?
+                       retry, up to 3 attempts               → revert + us-blocked
+```
+
+| Component | Role |
+|---|---|
+| `gitea` | Forge, work queue and source of truth. Web on `:3000`, SSH on `:2222`. |
+| `runner` | Gitea Actions runner: CI only (`make test` + `tests/acceptance/*/run.sh`). No LLM. |
+| `orchestrator` | Go service on `:8000`. The only thing that changes labels; dispatches agents, merges, deploys, reverts. |
+| `agent` | One-shot Claude Code container, one role per run: `planner`, `tester`, `dev`, `reviewer`. |
+| staging | One container per project, `forge-staging-<owner>-<repo>`, on `localhost:<9000 + repo id>`. |
+
+## Setup
+
+Requires Docker with Compose, `openssl`, `ssh-keygen`, and a Claude API key or subscription token.
 
 ```bash
 # 1. Secrets, and one URL for Gitea everywhere (host, containers, CI jobs)
@@ -15,7 +40,7 @@ docker compose up -d gitea
 docker compose exec -T -u git gitea gitea admin user create --admin --username forge \
   --email forge@forge.local --password "$(cat secrets/gitea-admin-password)" --must-change-password=false
 
-# 3. Tokens -> .env: orchestrator API token (GITEA_TOKEN) and runner registration token
+# 3. Tokens: put the first in .env as GITEA_TOKEN, the second as GITEA_RUNNER_REGISTRATION_TOKEN
 docker compose exec -T -u git gitea gitea admin user generate-access-token \
   -u forge -t orchestrator --scopes write:repository,write:issue --raw
 docker compose exec -T -u git gitea gitea actions generate-runner-token
@@ -25,26 +50,70 @@ docker compose up -d runner
 docker compose build agent
 docker compose up --build -d orchestrator
 
-# 5. A project: Gitea repo, deploy key, CI workflow, `forge` topic; with a spec file, also opens it as a `spec` issue.
+# 5. A first project: Gitea repo, deploy key, CI workflow, `forge` topic
 ./new-project.sh sandbox
 ```
 
-One forge serves every repo tagged with the `forge` topic: `./new-project.sh NAME [SPEC_FILE]` adds one, no restart needed.
-A worked example, every step shown: [`examples/url-shortener/WALKTHROUGH.md`](examples/url-shortener/WALKTHROUGH.md) (`./new-project.sh shortener examples/url-shortener/spec.md`).
+Check it is up: `curl localhost:8000/health`.
 
-Then create an issue in a project (e.g. `forge/sandbox`) with explicit acceptance criteria and the `us-todo` label, and check:
+## Usage
 
-1. it moves to `us-in-progress`; a `tester` comment, then a `dev` comment show progress and a summary;
-2. a PR from `agent/us-<n>` opens (tester commit + dev commit), the issue moves to `us-review`;
-3. the `ci` workflow runs `make test` and `tests/acceptance/*/run.sh` (repo › Actions);
-4. a `reviewer` comment ends with `VERDICT: approve`, the PR is squash-merged and the issue closed.
-   Rejections show up as `🔁 Attempt n/3` comments with the feedback given to the dev; after 3 the issue moves to `us-blocked`.
+### Projects
 
-To build a whole feature, open an issue describing it with the `spec` label instead: the planner comments a plan and creates the stories, which run in dependency order, up to `MAX_AGENTS` at once (stories that do not depend on each other run in parallel); the spec closes when they are all done. When `main` moved under a finished story, a `🔄` comment shows the orchestrator merging it into the branch and rerunning CI before the merge.
+Every Gitea repo with the `forge` topic is a project. Add one with `./new-project.sh NAME [SPEC_FILE]`, no restart needed; with a spec file it also opens it as a `spec` issue.
 
-A blocked US is retried by setting `us-todo` again: it starts over from the tester. A blocked spec is retried by setting `spec` again (planning failed) or `spec-active` (over budget: raise `MAX_COST_PER_SPEC` first).
-Once the target repo has a `Dockerfile` (the planner adds one when a spec describes a service), every merge is deployed to that project's staging at http://localhost:<9000 + repo id> (container `forge-staging-<owner>-<repo>`; the 🚀 comment gives the URL). If `GET /health` does not answer 200 within a minute, the merge is reverted on `main`, the previous version redeployed, and the US reopened as `us-blocked`.
-Existing target repos: update `.gitea/workflows/ci.yml` from `templates/ci.yml` through a pull request merged in the web UI (the orchestrator protects `main` against every push).
-Logs: `docker compose logs -f orchestrator runner` · status: `curl localhost:8000/health` (issues being worked on, as `owner/repo#n`).
+Worked example with every step shown: [`examples/url-shortener/WALKTHROUGH.md`](examples/url-shortener/WALKTHROUGH.md) (`./new-project.sh shortener examples/url-shortener/spec.md`).
 
-Claude Code skills (in `.claude/skills/`, available in any Claude Code session opened here): `forge-setup` (install, start, rebuild after changes), `forge-spec` (write a spec and open it, creating the project if needed), `forge-status` (projects, running work, blocked issues, spend), `forge-unblock` (diagnose and retry a blocked story or spec).
+### Build a feature: `spec` label
+
+Open an issue describing the feature with the `spec` label. The planner comments a plan and creates the stories, which run in dependency order, up to `MAX_AGENTS` at once; independent stories run in parallel. The spec closes when all its stories are done.
+
+### Build one story: `us-todo` label
+
+Open an issue with explicit acceptance criteria and the `us-todo` label (e.g. in `forge/sandbox`). You should see:
+
+1. The issue moves to `us-in-progress`; `tester` then `dev` comments show progress and a summary.
+2. A PR from `agent/us-<n>` opens (tester commit + dev commit) and the issue moves to `us-review`.
+3. The `ci` workflow runs (repo › Actions).
+4. A `reviewer` comment ends with `VERDICT: approve`; the PR is squash-merged and the issue closed.
+
+Rejections show up as `🔁 Attempt n/3` comments with the feedback given to the dev. After 3 attempts the issue moves to `us-blocked`. If `main` moved under a finished story, a `🔄` comment shows the orchestrator merging `main` into the branch and rerunning CI first.
+
+### Staging
+
+Once a project has a `Dockerfile` (the planner adds one when a spec describes a service), every merge is deployed to `http://localhost:<9000 + repo id>`; the 🚀 comment gives the URL. If `GET /health` does not answer 200 within a minute, the merge is reverted on `main`, the previous version redeployed, and the story reopened as `us-blocked`.
+
+### Retrying blocked work
+
+| Blocked | Retry by setting |
+|---|---|
+| Story (`us-blocked`) | `us-todo` (starts over from the tester) |
+| Spec, planning failed | `spec` |
+| Spec, over budget | `spec-active`, after raising `MAX_COST_PER_SPEC` |
+
+## Configuration (`.env`)
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `ANTHROPIC_API_KEY` / `CLAUDE_CODE_OAUTH_TOKEN` | — | Claude credentials, set one (`claude setup-token` gives the second). |
+| `GITEA_TOKEN` | — | Orchestrator API token, never given to agents. |
+| `GITEA_RUNNER_REGISTRATION_TOKEN` | — | act_runner registration. |
+| `POLL_SECONDS` | `30` | How often the orchestrator polls Gitea. |
+| `MAX_AGENTS` | `2` in `.env.example` | Specs and stories worked on at once, across all projects. Keep `runner/config.yaml` capacity at least as high. |
+| `MAX_COST_PER_SPEC` | `20` | USD; a spec's remaining stories are blocked once its agents cost more. |
+| `PROTECTED_PATHS` | `.gitea/` | Comma-separated path prefixes a PR must not touch; such a PR is blocked, never merged. |
+
+## Operations
+
+- **Logs:** `docker compose logs -f orchestrator runner`
+- **Status:** `curl localhost:8000/health` lists issues being worked on, as `owner/repo#n`.
+- **CI template change:** the orchestrator protects `main` against every push, so update each existing project's `.gitea/workflows/ci.yml` from `templates/ci.yml` through a PR merged in the web UI.
+
+## Claude Code skills
+
+Available in any Claude Code session opened in this directory (`.claude/skills/`):
+
+- `forge-setup`: install, start, rebuild after changes
+- `forge-spec`: write a spec and open it, creating the project if needed
+- `forge-status`: projects, running work, blocked issues, spend
+- `forge-unblock`: diagnose and retry a blocked story or spec
