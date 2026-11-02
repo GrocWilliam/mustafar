@@ -19,7 +19,7 @@ Save it to a file in your scratchpad: first line `# Title`, then the body. Model
 
 - **Concrete, testable behavior**: inputs and exact outputs, commands and their output, HTTP requests with status codes and bodies, error cases. No "fast", "nice", "robust".
 - **Interfaces by name**: modules, functions, CLI commands, endpoints, file formats, how to start it (`python3 -m app`, `node server.js`...).
-- **Stack**: language and whether dependencies are allowed. CI and agents run Debian bookworm with Node 20, Python 3, make and git; anything else must be installable by `make test`.
+- **Stack**: language and whether dependencies are allowed. CI and agents run Debian bookworm with Node 20, Python 3, make, git and Chromium (`$CHROMIUM_PATH`, for browser tests); anything else must be installable by `make test`.
 - **A service** must listen on port 8080 (or `$PORT`) and answer `GET /health` with 200: the planner then adds a `Dockerfile` and every merge is deployed to staging. Tests never use Docker.
 - **Size**: at most 20 stories of one ~30-turn dev session each. Split a bigger product into successive specs.
 - **Existing project**: read its code first (`git clone http://gitea:3000/$repo.git` into the scratchpad) and describe only the change, in the terms the code already uses.

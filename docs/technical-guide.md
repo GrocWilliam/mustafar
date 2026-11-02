@@ -75,7 +75,7 @@ Only the orchestrator writes labels; the label is a trace of the state, not a lo
 
 Each agent run is a fresh `forge-agent` container: it clones the repository, runs `claude -p` once in one role, pushes its branch, and is removed.
 
-The image is `node:20-bookworm` (the same image as the CI jobs) plus `@anthropic-ai/claude-code`, `agents/agent.sh` as entrypoint, and the prompts in `/prompts`. It runs as the `node` user, because Claude Code refuses `bypassPermissions` as root.
+The image is `forge-ci`, the CI jobs' image (`ci/Dockerfile`: `node:20-bookworm` plus Debian Chromium at `$CHROMIUM_PATH`), plus `@anthropic-ai/claude-code`, `agents/agent.sh` as entrypoint, and the prompts in `/prompts`. It runs as the `node` user, because Claude Code refuses `bypassPermissions` as root.
 
 The orchestrator passes everything through environment variables: `ROLE`, `REPO_URL`, `DEPLOY_KEY`, `ISSUE_NUMBER`, `ISSUE_TITLE`, `ISSUE_BODY`, `FEEDBACK`, plus `ANTHROPIC_API_KEY` or `CLAUDE_CODE_OAUTH_TOKEN`. Containers carry the label `forge.agent` and join the `forge` network.
 
@@ -141,7 +141,7 @@ After each dev attempt the orchestrator runs fixed checks in order; the first on
 
 ### The CI workflow
 
-Each project carries `.gitea/workflows/ci.yml`, copied from `templates/ci.yml` and protected by `PROTECTED_PATHS`. It runs on `pull_request` in two jobs: `make test`, then every `tests/acceptance/*/run.sh` from a fresh checkout, so the dev's `Makefile` can neither skip nor rewrite them. Jobs run in `node:20-bookworm` on the `forge` network, without the Docker socket.
+Each project carries `.gitea/workflows/ci.yml`, copied from `templates/ci.yml` and protected by `PROTECTED_PATHS`. It runs on `pull_request` in two jobs: `make test`, then every `tests/acceptance/*/run.sh` from a fresh checkout, so the dev's `Makefile` can neither skip nor rewrite them. Jobs run in the local `forge-ci` image, which ships Chromium for browser tests, on the `forge` network, without the Docker socket.
 
 ### Merge (`land.go`)
 
@@ -224,6 +224,7 @@ The `forge-setup` skill reruns these steps safely; the commands below are what i
 | First setup | README steps 1 to 5: `.env`, deploy key, `/etc/hosts`, Gitea admin and tokens, then the services |
 | After a reboot | `docker compose up -d gitea runner orchestrator` |
 | Changed `orchestrator/*.go` | `cd orchestrator && go vet ./... && go test ./...`, then `docker compose up --build -d orchestrator` |
+| Changed `ci/Dockerfile` | `docker compose build agent` (rebuilds `forge-ci` too), then `docker compose restart runner` |
 | Changed `agents/` (script, prompts, Dockerfile) | `docker compose build agent`; the next run uses it, no restart |
 | Changed `.env` | `docker compose up -d orchestrator` |
 | Changed `templates/ci.yml` | One pull request per project, merged in the web UI: `main` refuses pushes |

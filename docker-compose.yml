@@ -49,9 +49,18 @@ services:
       - label=disable
     networks: [forge]
 
-  # Image only: the orchestrator starts one container per US. Build with `docker compose build agent`.
+  # Image only: the CI jobs' toolchain (runner/config.yaml), and the base of the agent image.
+  ci:
+    build: ./ci
+    image: forge-ci
+    profiles: [agent]
+
+  # Image only: the orchestrator starts one container per US. Build with `docker compose build agent`, which builds `ci` first.
   agent:
-    build: ./agents
+    build:
+      context: ./agents
+      additional_contexts:
+        ci: service:ci
     image: forge-agent
     profiles: [agent]
 

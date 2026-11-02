@@ -105,7 +105,7 @@ Decisions so far:
 - CI (`templates/ci.yml`, protected) runs `make test`, then, in a second job from a fresh checkout so `make test` cannot rewrite them, every `tests/acceptance/*/run.sh` itself: the dev owns the Makefile but cannot drop the acceptance tests from CI. Merged acceptance tests become the regression suite.
 - Gitea's `ROOT_URL` is `http://gitea:3000` everywhere (host via `/etc/hosts`) so CI checkouts work from job containers.
 - Deployment (`deploy.go`), still under the merge lock, so each merge gets its verdict before the next: if the merged `main` has a `Dockerfile`, the orchestrator downloads its archive from Gitea, builds `forge-app/<owner>/<repo>:<sha>` through the Docker API and replaces the project's staging container (network `forge`, `127.0.0.1:<9000 + repo id>`). No `Dockerfile` = nothing to deploy. If the build, the start or `GET /health` fails, a one-shot agent container with `ROLE=revert` runs plain `git revert` and pushes it to `revert/<sha>` with the deploy key (no Claude), the orchestrator opens a pull request from it and merges it without waiting for CI (retrying for 30 s while Gitea still checks the new pull request), the previous `main` is redeployed, and the US is reopened and blocked with the reason. Retrying it starts over from the reverted `main`.
-- CI job containers never get the Docker socket (`docker_host: "-"`). Agents and CI use the same image (`node:20-bookworm`).
+- CI job containers never get the Docker socket (`docker_host: "-"`). Agents and CI use the same toolchain: CI jobs run in `forge-ci` (`ci/Dockerfile`: `node:20-bookworm` + Debian Chromium at `$CHROMIUM_PATH`, for browser tests), and the agent image is built on it.
 
 ## Files (M1 – M6)
 
@@ -141,7 +141,7 @@ Decisions so far:
 │   ├── agent_runner.go       # runs one role, reads stream-json (+ agent_runner_test.go)
 │   └── config.go
 └── agents/
-    ├── Dockerfile            # node:20-bookworm (same image as CI jobs) + claude-code
+    ├── Dockerfile            # forge-ci (the CI jobs' image, ci/Dockerfile) + claude-code
     ├── agent.sh              # clone, check out the US branch, run claude -p as $ROLE, push (ROLE=revert: git revert only)
     └── prompts/              # planner.md, tester.md, dev.md, reviewer.md
 ```

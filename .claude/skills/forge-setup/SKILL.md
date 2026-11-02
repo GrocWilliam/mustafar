@@ -29,6 +29,7 @@ Then offer the `forge-spec` skill to create a first project.
 ## After changing the forge's code
 
 - `orchestrator/*.go`: `cd orchestrator && go vet ./... && go test ./...`, then `docker compose up --build -d orchestrator`.
+- `ci/Dockerfile`: `docker compose build agent` (rebuilds `forge-ci` too), then `docker compose restart runner` once no CI job runs.
 - `agents/agent.sh`, `agents/prompts/*`, `agents/Dockerfile`: `docker compose build agent` (the next agent run uses it; no restart needed).
 - `.env`: `docker compose up -d orchestrator` (recreates it).
 - `templates/ci.yml`: every project keeps its own copy in `.gitea/workflows/ci.yml`, and `main` refuses pushes. For each project (`api GET "/repos/search?topic=true&q=forge&limit=50"`), create a branch with the new file through the contents API and open a pull request, then ask the user to merge them in the web UI. Never disable the branch protection to push it.

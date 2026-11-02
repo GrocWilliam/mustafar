@@ -2,8 +2,9 @@
 runner:
   capacity: 2 # keep >= MAX_AGENTS, or parallel stories queue for CI
   labels:
-    - "ubuntu-latest:docker://node:20-bookworm"
+    - "ubuntu-latest:docker://forge-ci" # built locally (ci/Dockerfile): the same toolchain as the agents
 container:
+  force_pull: false # forge-ci exists only on this host: pulling it would fail
   # Job containers join the compose network to reach http://gitea:3000.
   network: forge
   # "-" = never mount the Docker socket into jobs: CI runs agent-written code, which must not get root on the host.
