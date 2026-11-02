@@ -33,6 +33,30 @@ func TestParseAndDescribe(t *testing.T) {
 	}
 }
 
+func TestSummaryStatus(t *testing.T) {
+	failed := parse([]byte(`{"type":"result","subtype":"error_max_turns","is_error":true,"num_turns":30,"total_cost_usd":1.5}`))
+	cases := []struct {
+		exit   int
+		result *streamEvent
+		want   []string
+	}{
+		{0, &streamEvent{Subtype: "success"}, []string{"✅ finished", "forge:cost="}},
+		{1, &failed, []string{"exit code 1", "`error_max_turns`", "cost: $1.50", "forge:cost=1.5000"}},
+		{124, nil, []string{"timed out after 45m", "not counted"}},
+	}
+	for _, c := range cases {
+		got := summary("dev", nil, c.result, c.exit, "")
+		for _, want := range c.want {
+			if !strings.Contains(got, want) {
+				t.Errorf("summary(exit %d) = %q, missing %q", c.exit, got, want)
+			}
+		}
+	}
+	if got := summary("dev", nil, &streamEvent{Subtype: "success"}, 0, ""); strings.Contains(got, "Claude Code: `") {
+		t.Errorf("success summary shows a subtype: %q", got)
+	}
+}
+
 func TestShort(t *testing.T) {
 	if got := short(strings.Repeat("é", 200), 10); got != strings.Repeat("é", 9)+"…" {
 		t.Fatalf("short = %q", got)

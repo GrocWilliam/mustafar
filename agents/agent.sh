@@ -5,10 +5,13 @@ set -euo pipefail
 
 branch="agent/us-${ISSUE_NUMBER}"
 
-mkdir -p ~/.ssh
-printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/id_ed25519
-chmod 600 ~/.ssh/id_ed25519
+# The key lives on disk only while git needs it, so Claude cannot read it from ~/.ssh.
+# Not exported: claude does not inherit it (a same-user /proc read could still find it).
+key="$DEPLOY_KEY"
 unset DEPLOY_KEY
+mkdir -p ~/.ssh
+write_key() { (umask 077; printf '%s\n' "$key" > ~/.ssh/id_ed25519); }
+write_key
 export GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=accept-new"
 
 git clone "$REPO_URL" workspace >&2
@@ -27,6 +30,8 @@ case "$ROLE" in
   *) git checkout "$branch" >&2 ;;         # dev and reviewer continue the tester's branch
 esac
 start=$(git rev-parse HEAD)
+rm ~/.ssh/id_ed25519
+case "$ROLE" in planner | reviewer) unset key ;; esac # read-only roles never push
 
 {
   cat "/prompts/${ROLE}.md"
@@ -47,6 +52,7 @@ if [ "$(git rev-parse HEAD)" = "$start" ]; then
   echo "agent produced no commit" >&2
   exit 3
 fi
+write_key
 if [ "$ROLE" = tester ]; then
   git push --force -u origin "$branch" >&2 # replaces the branch of an earlier run of this US
 else

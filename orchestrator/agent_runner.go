@@ -27,6 +27,7 @@ type streamEvent struct {
 			Input map[string]any `json:"input"`
 		} `json:"content"`
 	} `json:"message"`
+	Subtype      string  `json:"subtype"` // on a result: "success", or why the run stopped ("error_max_turns"...)
 	Result       string  `json:"result"`
 	NumTurns     int     `json:"num_turns"`
 	TotalCostUSD float64 `json:"total_cost_usd"`
@@ -89,10 +90,16 @@ func progress(role string, number int, steps []string) string {
 
 func summary(role string, steps []string, result *streamEvent, exitCode int, stderr string) string {
 	status := "✅ finished"
-	if exitCode != 0 {
+	switch {
+	case exitCode == 124: // timeout(1) in agent.sh
+		status = "❌ timed out after 45m"
+	case exitCode != 0:
 		status = fmt.Sprintf("❌ failed (exit code %d)", exitCode)
 	}
-	stats, text := "turns: ? · cost: ?", "(no result message from Claude Code)"
+	if result != nil && result.Subtype != "" && result.Subtype != "success" {
+		status += fmt.Sprintf(" · Claude Code: `%s`", result.Subtype)
+	}
+	stats, text := "turns: ? · cost: unknown, not counted in the spec budget", "(no result message from Claude Code)"
 	if result != nil {
 		stats = fmt.Sprintf("turns: %d · cost: $%.2f", result.NumTurns, result.TotalCostUSD)
 		text = clip(result.Result, 3000)
