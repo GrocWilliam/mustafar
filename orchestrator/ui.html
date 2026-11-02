@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mustafar forge</title>
+<style>
+:root {
+  --bg: #f6f7f9; --panel: #ffffff; --line: #e3e6ea; --text: #1d2229; --muted: #5d6673;
+  --accent: #3b6fd8; --ok: #1f8a4c; --warn: #b7791f; --bad: #c2412d; --todo: #d9dde3;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #14171c; --panel: #1c2027; --line: #2c323b; --text: #e6e9ee; --muted: #9aa3ae;
+    --accent: #6d9bf2; --ok: #45b97a; --warn: #e0a84a; --bad: #ec6a55; --todo: #343b45; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+header { position: sticky; top: 0; z-index: 2; display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: center;
+  padding: 12px 16px; background: var(--panel); border-bottom: 1px solid var(--line); }
+header h1 { font-size: 16px; margin: 0; }
+.pill { display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px; border-radius: 999px; background: var(--bg);
+  border: 1px solid var(--line); font-size: 12px; color: var(--muted); white-space: nowrap; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); }
+.dot.off { background: var(--bad); }
+main { max-width: 1100px; margin: 0 auto; padding: 16px; display: grid; gap: 20px; }
+.project > h2 { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: baseline; font-size: 18px; margin: 0 0 10px; }
+.project > h2 small { font-size: 13px; font-weight: 400; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px; margin-bottom: 12px; }
+.spec-head { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; }
+.spec-head h3 { margin: 0; font-size: 15px; flex: 1 1 260px; }
+.phase { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; padding: 2px 8px; border-radius: 6px; }
+.phase.active { background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); }
+.phase.planning { background: color-mix(in srgb, var(--warn) 20%, transparent); color: var(--warn); }
+.phase.blocked { background: color-mix(in srgb, var(--bad) 18%, transparent); color: var(--bad); }
+.phase.done { background: color-mix(in srgb, var(--ok) 18%, transparent); color: var(--ok); }
+.meters { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px 20px; margin: 10px 0 4px; }
+.meter { font-size: 12px; color: var(--muted); }
+.bar { height: 8px; border-radius: 4px; background: var(--todo); overflow: hidden; margin-top: 4px; }
+.bar > span { display: block; height: 100%; background: var(--ok); border-radius: 4px; transition: width .4s; }
+.bar.cost > span { background: var(--accent); }
+.bar.cost.over > span { background: var(--bad); }
+.stories { list-style: none; margin: 10px 0 0; padding: 0; border-top: 1px solid var(--line); }
+.story { padding: 10px 0; border-bottom: 1px solid var(--line); display: grid; gap: 6px; }
+.story:last-child { border-bottom: 0; }
+.story-line { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: center; }
+.story-title { flex: 1 1 260px; min-width: 0; }
+.story-title .num { color: var(--muted); font-variant-numeric: tabular-nums; }
+.meta { font-size: 12px; color: var(--muted); }
+.steps { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 3px; flex: 1 1 380px; max-width: 520px; }
+.step { font-size: 10.5px; text-align: center; color: var(--muted); }
+.step::before { content: ""; display: block; height: 6px; border-radius: 3px; background: var(--todo); margin-bottom: 3px; }
+.step.done::before { background: var(--ok); }
+.step.current { color: var(--text); font-weight: 600; }
+.step.current::before { background: var(--accent); }
+.step.current.live::before { animation: pulse 1.2s ease-in-out infinite; }
+.step.done.current::before { background: var(--ok); }
+.step.current.blocked { color: var(--bad); }
+.step.current.blocked::before { background: var(--bad); animation: none; }
+@keyframes pulse { 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { .step.current.live::before { animation: none; } }
+.agent { border-left: 3px solid var(--accent); padding: 6px 10px; background: var(--bg); border-radius: 0 6px 6px 0; }
+.agent b { font-weight: 600; }
+.agent ol { margin: 4px 0 0; padding-left: 18px; font: 12px/1.5 var(--mono); color: var(--muted); max-height: 9.5em; overflow: auto; }
+.agent ol li { overflow-wrap: anywhere; }
+.agent ol li:last-child { color: var(--text); }
+.blocked-box { border-left: 3px solid var(--bad); padding: 6px 10px; background: color-mix(in srgb, var(--bad) 8%, transparent);
+  border-radius: 0 6px 6px 0; display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; }
+.blocked-box p { margin: 0; flex: 1 1 300px; overflow-wrap: anywhere; }
+button { font: inherit; font-size: 13px; padding: 5px 12px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel);
+  color: var(--text); cursor: pointer; min-height: 32px; }
+button:hover { border-color: var(--accent); }
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+button.danger { color: var(--bad); }
+button:disabled { opacity: .5; cursor: wait; }
+button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+form.inline { display: inline-flex; gap: 6px; align-items: center; }
+input, textarea, select { font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; }
+input[type=number] { width: 90px; }
+.new-spec { display: grid; gap: 8px; }
+.new-spec textarea { min-height: 160px; font: 13px/1.5 var(--mono); width: 100%; }
+details > summary { cursor: pointer; color: var(--muted); font-size: 13px; padding: 4px 0; }
+.empty { color: var(--muted); font-style: italic; }
+.error { color: var(--bad); }
+#toast { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); max-width: calc(100% - 32px); padding: 10px 16px;
+  border-radius: 8px; background: var(--text); color: var(--bg); box-shadow: 0 4px 20px #0004; opacity: 0; pointer-events: none; transition: opacity .2s; z-index: 3; }
+#toast.show { opacity: 1; }
+#toast.bad { background: var(--bad); color: #fff; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Mustafar forge</h1>
+  <span class="pill" id="conn"><span class="dot"></span><span>connecting…</span></span>
+  <span class="pill" id="slots"></span>
+  <span class="pill" id="updated"></span>
+</header>
+<main id="app"><p class="empty">Loading…</p></main>
+<div id="toast" role="status" aria-live="polite"></div>
+<script>
+"use strict";
+const STEPS = ["Queued", "Tests", "Code", "CI", "Review", "Merge", "Done"];
+const REFRESH_MS = 5000;
+const app = document.getElementById("app");
+const open = new Set(); // keys of <details> the user opened, kept across refreshes
+let state = null;
+
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const money = (n) => "$" + Number(n || 0).toFixed(2);
+function elapsed(iso) {
+  const s = Math.max(0, Math.round((Date.now() - new Date(iso)) / 1000));
+  return s < 60 ? s + "s" : s < 3600 ? Math.floor(s / 60) + "m " + (s % 60) + "s" : Math.floor(s / 3600) + "h " + Math.floor((s % 3600) / 60) + "m";
+}
+
+function agentBox(a) {
+  if (!a) return "";
+  const steps = (a.steps || []).map((s) => `<li>${esc(s)}</li>`).join("");
+  return `<div class="agent"><b>🤖 ${esc(a.role)}</b> · <span class="meta">running for <span data-since="${esc(a.started)}">${elapsed(a.started)}</span>, ${a.total || 0} steps</span>
+    ${a.waiting ? `<div class="meta">⏸️ ${esc(a.waiting)}</div>` : ""}${steps ? `<ol start="${Math.max(1, (a.total || 0) - (a.steps || []).length + 1)}">${steps}</ol>` : ""}</div>`;
+}
+
+function stepsBar(st) {
+  return `<div class="steps" role="img" aria-label="Step ${st.step + 1} of ${STEPS.length}: ${STEPS[st.step]}${st.blocked ? ", blocked" : ""}">` +
+    STEPS.map((name, i) => {
+      let cls = i < st.step ? "done" : i === st.step ? "current" : "";
+      if (i === st.step && st.step === STEPS.length - 1) cls = "done current";
+      if (i === st.step && st.blocked) cls += " blocked";
+      if (i === st.step && st.agent) cls += " live";
+      return `<span class="step ${cls}">${name}</span>`;
+    }).join("") + "</div>";
+}
+
+function storyItem(p, st) {
+  const deps = st.deps.length ? ` · after ${st.deps.map((d) => "#" + d).join(", ")}` : "";
+  const attempt = st.attempt > 1 && st.step > 0 && st.step < 6 ? ` · attempt ${st.attempt}/3` : "";
+  const blocked = st.blocked ? `<div class="blocked-box"><p>⛔ ${esc(st.blocked)}</p>
+      <button data-act="retry" data-project="${esc(p.name)}" data-number="${st.number}">Retry</button>
+      <button class="danger" data-act="retry-fresh" data-project="${esc(p.name)}" data-number="${st.number}">Retry from scratch</button></div>` : "";
+  return `<li class="story"><div class="story-line">
+      <span class="story-title"><span class="num">#${st.number}</span> <a href="${esc(st.url)}" target="_blank" rel="noopener">${esc(st.title)}</a>
+      <span class="meta">${money(st.cost)}${attempt}${deps}</span></span>${stepsBar(st)}</div>${agentBox(st.agent)}${blocked}</li>`;
+}
+
+function specCard(p, s) {
+  const total = s.stories.length;
+  const over = s.cost > s.budget;
+  const key = `budget:${p.name}#${s.number}`;
+  const blocked = s.blocked ? `<div class="blocked-box"><p>⛔ ${esc(s.blocked)}</p>
+      <button data-act="retry" data-project="${esc(p.name)}" data-number="${s.number}">Retry spec</button></div>` : "";
+  const stories = total ? `<ul class="stories">${s.stories.map((st) => storyItem(p, st)).join("")}</ul>`
+    : `<p class="empty">${s.phase === "planning" ? "Waiting for the planner…" : "No stories."}</p>`;
+  return `<section class="card" aria-label="Spec #${s.number}">
+    <div class="spec-head"><h3><a href="${esc(s.url)}" target="_blank" rel="noopener">#${s.number} ${esc(s.title)}</a></h3>
+      <span class="phase ${s.phase}">${s.phase}</span></div>
+    <div class="meters">
+      <div class="meter">Stories: ${s.done} / ${total} done<div class="bar"><span style="width:${total ? (100 * s.done) / total : 0}%"></span></div></div>
+      <div class="meter">Spend: ${money(s.cost)} of ${money(s.budget)}${over ? " — over budget" : ""}
+        <div class="bar cost${over ? " over" : ""}"><span style="width:${Math.min(100, (100 * s.cost) / (s.budget || 1))}%"></span></div></div>
+    </div>
+    ${agentBox(s.agent)}${blocked}
+    ${s.phase === "done" ? "" : `<details data-key="${esc(key)}"${open.has(key) ? " open" : ""}><summary>Change budget</summary>
+      <form class="inline" data-act="budget" data-project="${esc(p.name)}" data-number="${s.number}">
+        <label>New budget ($) <input type="number" name="budget" min="1" max="1000" step="1" value="${Math.ceil(Math.max(s.budget, s.cost + 5))}" required></label>
+        <button type="submit">Set</button></form></details>`}
+    ${stories}</section>`;
+}
+
+function projectSection(p) {
+  const active = p.specs.filter((s) => s.phase !== "done").reverse();
+  const done = p.specs.filter((s) => s.phase === "done").reverse();
+  const doneKey = `done:${p.name}`, newKey = `new:${p.name}`;
+  return `<section class="project"><h2>${esc(p.name)}
+      <small><a href="${esc(p.url)}" target="_blank" rel="noopener">Gitea</a> · <a href="${esc(p.staging)}" target="_blank" rel="noopener">staging</a></small></h2>
+    ${p.error ? `<p class="error">Could not read this project: ${esc(p.error)}</p>` : ""}
+    ${active.map((s) => specCard(p, s)).join("") || `<p class="empty">No spec in progress.</p>`}
+    <details class="card" data-key="${esc(newKey)}"${open.has(newKey) ? " open" : ""}><summary>New spec</summary>
+      <form class="new-spec" data-act="spec" data-project="${esc(p.name)}">
+        <label>Title <input name="title" maxlength="200" required style="width:100%"></label>
+        <label>Spec (Markdown: concrete, testable behaviour; see the forge-spec skill)<textarea name="body" required></textarea></label>
+        <div><button class="primary" type="submit">Open spec</button> <span class="meta">The planner starts right away: this starts paid agent runs.</span></div>
+      </form></details>
+    ${done.length ? `<details data-key="${esc(doneKey)}"${open.has(doneKey) ? " open" : ""}><summary>${done.length} finished spec${done.length > 1 ? "s" : ""}</summary>
+      ${done.map((s) => specCard(p, s)).join("")}</details>` : ""}</section>`;
+}
+
+function render() {
+  if (!state) return;
+  document.getElementById("slots").textContent = `${state.running.length} / ${state.maxAgents} agent slots busy`;
+  // Never wipe what the user is typing: refresh again once they leave the field.
+  const typing = document.activeElement && document.activeElement.closest("form") && app.contains(document.activeElement);
+  if (typing) return;
+  app.innerHTML = state.projects.map(projectSection).join("") || `<p class="empty">No forge project yet: create one with the forge-spec skill.</p>`;
+}
+
+async function refresh() {
+  const conn = document.getElementById("conn");
+  try {
+    const r = await fetch("/api/state", { cache: "no-store" });
+    if (!r.ok) throw new Error(r.status);
+    state = await r.json();
+    conn.innerHTML = `<span class="dot"></span><span>orchestrator up</span>`;
+    document.getElementById("updated").textContent = "updated " + new Date().toLocaleTimeString();
+    render();
+  } catch (e) {
+    conn.innerHTML = `<span class="dot off"></span><span>orchestrator unreachable</span>`;
+  }
+}
+
+function toast(msg, bad) {
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.className = "show" + (bad ? " bad" : "");
+  clearTimeout(t.timer); t.timer = setTimeout(() => (t.className = ""), 5000);
+}
+
+async function act(path, body, button) {
+  if (button) button.disabled = true;
+  try {
+    const r = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json", "X-Forge-UI": "1" }, body: JSON.stringify(body) });
+    const out = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(out.error || r.statusText);
+    toast(out.message || "Done");
+    return true;
+  } catch (e) {
+    toast(e.message, true);
+    return false;
+  } finally {
+    if (button) button.disabled = false;
+    refresh();
+  }
+}
+
+app.addEventListener("click", (e) => {
+  const b = e.target.closest("button[data-act]");
+  if (!b) return;
+  const number = Number(b.dataset.number), project = b.dataset.project;
+  if (b.dataset.act === "retry") {
+    if (confirm(`Retry #${number}? This starts paid agent runs.`)) act("/api/retry", { project, number }, b);
+  } else if (b.dataset.act === "retry-fresh") {
+    if (confirm(`Retry #${number} from scratch? Its branch and pull request are deleted and the tester starts over. This starts paid agent runs.`))
+      act("/api/retry", { project, number, fresh: true }, b);
+  }
+});
+
+app.addEventListener("submit", async (e) => {
+  const f = e.target.closest("form[data-act]");
+  if (!f) return;
+  e.preventDefault();
+  const data = new FormData(f), project = f.dataset.project, button = f.querySelector("button[type=submit]");
+  let ok = false;
+  if (f.dataset.act === "budget") {
+    const budget = Number(data.get("budget"));
+    if (confirm(`Set the budget of spec #${f.dataset.number} to $${budget}?`))
+      ok = await act("/api/budget", { project, number: Number(f.dataset.number), budget }, button);
+  } else if (f.dataset.act === "spec") {
+    if (confirm(`Open "${data.get("title")}" as a spec of ${project}? The planner starts right away (paid agent runs).`)) {
+      ok = await act("/api/spec", { project, title: data.get("title"), body: data.get("body") }, button);
+      if (ok) { f.reset(); open.delete(`new:${project}`); }
+    }
+  }
+  if (ok) document.activeElement.blur();
+});
+
+app.addEventListener("toggle", (e) => {
+  const d = e.target;
+  if (d.dataset && d.dataset.key) d.open ? open.add(d.dataset.key) : open.delete(d.dataset.key);
+}, true);
+
+// The elapsed times tick every second without refetching.
+setInterval(() => document.querySelectorAll("[data-since]").forEach((el) => (el.textContent = elapsed(el.dataset.since))), 1000);
+refresh();
+setInterval(refresh, REFRESH_MS);
+</script>
+</body>
+</html>

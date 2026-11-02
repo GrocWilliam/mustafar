@@ -29,7 +29,7 @@ Read the issue and all its comments (`api GET "/repos/$repo/issues/$n"` and `...
 ## 2. Fix
 
 - Edit a story or spec body: `api PATCH "/repos/$repo/issues/$n" '{"body": ...}'` (JSON built with `python3` so quotes and newlines survive). Keep the `---`, `Part of #` and `Depends on #` lines at the end of a story.
-- Budget: change `MAX_COST_PER_SPEC` in `.env`, then `docker compose up -d orchestrator` (recreates it with the new value; running stories go back to the queue).
+- Budget: for one spec, post a comment ending with `<!-- forge:budget=35.00 -->` on it (what the forge UI's budget form does; no restart). For every spec, change `MAX_COST_PER_SPEC` in `.env`, then `docker compose up -d orchestrator` (running stories go back to the queue).
 
 ## 3. Retry
 
@@ -39,4 +39,4 @@ Get the label ids from `api GET "/repos/$repo/labels"`. Remove `us-blocked` (`ap
 - a spec whose planning failed → `spec`: planned again (a failed plan's stories were closed);
 - a spec over budget → `spec-active`, then `us-todo` on each of its blocked stories.
 
-Always remove `us-blocked` first: the orchestrator only swaps the label it expects, so a leftover one stays forever. Report what you changed, and that `forge-status` shows the progress.
+Always remove `us-blocked` first: the orchestrator only swaps the label it expects, so a leftover one stays forever. Report what you changed, and that the forge UI (http://localhost:8000) and `forge-status` show the progress. The UI also has these retry and budget buttons, for the user to use directly.

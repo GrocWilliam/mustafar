@@ -55,7 +55,7 @@ Labels: `spec`, `us-todo`, `us-in-progress`, `us-review`, `us-blocked`. "Done" =
 ## Autonomy safeguards
 
 - **Retries**: at most 3 dev cycles per US, then `us-blocked` + a comment explaining the failure. `us-blocked` is the **only** point of human intervention.
-- **Budget**: cumulative cost per spec (the `total_cost_usd` field of the `result` message); exceeding `MAX_COST_PER_SPEC` → the spec and its remaining US go to `us-blocked`.
+- **Budget**: cumulative cost per spec (the `total_cost_usd` field of the `result` message); exceeding `MAX_COST_PER_SPEC` (or the spec's own `<!-- forge:budget=X -->` marker, set from the UI) → the spec and its remaining US go to `us-blocked`.
 - **Recovery**: on startup, the orchestrator removes the agent containers its previous run left (label `forge.agent`) and moves every `us-in-progress` US back to `us-todo` (no hourly timeout: a slow agent must not be duplicated).
 - `--max-turns 30` and a 45-minute timeout per agent run.
 
@@ -138,6 +138,7 @@ Decisions so far:
 │   ├── gitea_pulls.go        # PRs, commit status, branch update, merge, close
 │   ├── gitea_git.go          # default branch, branch head, recursive tree, archive
 │   ├── docker.go             # Docker Engine API over the Unix socket: containers, logs, image build
+│   ├── ui.go, ui.html        # forge UI on :8000: state from Gitea + live agent activity, retry/budget/spec actions (+ ui_test.go)
 │   ├── agent_runner.go       # runs one role, reads stream-json (+ agent_runner_test.go)
 │   └── config.go
 └── agents/

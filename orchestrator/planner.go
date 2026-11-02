@@ -74,26 +74,28 @@ func (o *project) abandonPlan(spec int, created []int, reason string) error {
 // On the way, it stops the specs that went over budget.
 func (o *project) readyStories(todo []issue) ([]issue, error) {
 	var ready []issue
-	costs := map[int]float64{} // per spec, computed once per poll
+	type spend struct{ cost, budget float64 }
+	costs := map[int]spend{} // per spec, computed once per poll
 	for _, story := range todo {
 		if o.isRunning(story.Number) || !o.dependenciesClosed(story) {
 			continue
 		}
 		if spec := refs(partOfLine, story.Body); len(spec) > 0 {
-			cost, known := costs[spec[0]]
+			s, known := costs[spec[0]]
 			if !known {
-				var err error
-				if cost, err = o.specCost(spec[0]); err != nil {
+				cost, budget, err := o.specCost(spec[0])
+				if err != nil {
 					return ready, err
 				}
-				costs[spec[0]] = cost
-				if cost > o.cfg.MaxCostPerSpec {
-					if err := o.stopSpec(spec[0], cost); err != nil {
+				s = spend{cost, budget}
+				costs[spec[0]] = s
+				if s.cost > s.budget {
+					if err := o.stopSpec(spec[0], s.cost, s.budget); err != nil {
 						return ready, err
 					}
 				}
 			}
-			if cost > o.cfg.MaxCostPerSpec {
+			if s.cost > s.budget {
 				continue
 			}
 		}
@@ -140,7 +142,7 @@ func (o *project) closeFinishedSpecs() error {
 		if !finished {
 			continue
 		}
-		cost, err := o.specCost(spec.Number)
+		cost, _, err := o.specCost(spec.Number)
 		if err != nil {
 			return err
 		}
@@ -157,8 +159,8 @@ func (o *project) closeFinishedSpecs() error {
 }
 
 // stopSpec blocks a spec over budget and its stories still waiting in `us-todo`.
-func (o *project) stopSpec(spec int, cost float64) error {
-	reason := fmt.Sprintf("spec #%d is over budget: $%.2f spent, MAX_COST_PER_SPEC is $%.2f.", spec, cost, o.cfg.MaxCostPerSpec)
+func (o *project) stopSpec(spec int, cost, budget float64) error {
+	reason := fmt.Sprintf("spec #%d is over budget: $%.2f spent, its budget is $%.2f.", spec, cost, budget)
 	log.Printf("%s: %s", o.name, reason)
 	stories, err := o.storiesOf(spec)
 	if err != nil {
@@ -173,7 +175,7 @@ func (o *project) stopSpec(spec int, cost float64) error {
 			}
 		}
 	}
-	return o.block(spec, "spec-active", reason+" Raise the budget, then set `spec-active` again and `us-todo` on its blocked stories.")
+	return o.block(spec, "spec-active", reason+" Raise its budget from the forge UI (http://localhost:8000), or MAX_COST_PER_SPEC, then retry the spec.")
 }
 
 // storiesOf reads a spec's story numbers from its plan comment.
@@ -185,19 +187,20 @@ func (o *project) storiesOf(spec int) ([]int, error) {
 	return planStories(comments), nil
 }
 
-// specCost adds up the cost of every agent run on a spec and on its stories, retries included.
-func (o *project) specCost(spec int) (float64, error) {
+// specCost adds up the cost of every agent run on a spec and on its stories, retries included,
+// and returns the spec's budget: MAX_COST_PER_SPEC, unless a budget marker on the spec raised it.
+func (o *project) specCost(spec int) (cost, budget float64, err error) {
 	comments, err := o.gitea.comments(spec)
 	if err != nil {
-		return 0, err
+		return 0, 0, err
 	}
-	total := sumCosts(comments)
+	cost = sumCosts(comments)
 	for _, number := range planStories(comments) {
 		storyComments, err := o.gitea.comments(number)
 		if err != nil {
-			return 0, err
+			return 0, 0, err
 		}
-		total += sumCosts(storyComments)
+		cost += sumCosts(storyComments)
 	}
-	return total, nil
+	return cost, specBudget(comments, o.cfg.MaxCostPerSpec), nil
 }

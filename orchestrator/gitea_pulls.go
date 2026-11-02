@@ -99,3 +99,7 @@ func (g *gitea) updatePR(pr int) error {
 	}
 	return err
 }
+
+func (g *gitea) closePR(number int) error {
+	return g.call("PATCH", fmt.Sprintf("/pulls/%d", number), map[string]string{"state": "closed"}, nil)
+}

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -121,6 +122,8 @@ func summary(role string, steps []string, result *streamEvent, exitCode int, std
 // A run stopped by the Claude usage limit is not the agent's fault: it waits for the reset and runs again,
 // so the limit never uses up a story's attempts.
 func (o *project) runAgent(role string, is issue, feedback string) (bool, string, error) {
+	key := fmt.Sprintf("%s#%d", o.name, is.Number)
+	defer o.setActivity(key, nil)
 	for {
 		ok, final, err := o.runOnce(role, is, feedback)
 		reset, limited := limitReset(final, time.Now())
@@ -131,6 +134,7 @@ func (o *project) runAgent(role string, is issue, feedback string) (bool, string
 		if _, err := o.gitea.comment(is.Number, msg); err != nil {
 			return false, "", err
 		}
+		o.setActivity(key, &agentActivity{Role: role, Started: time.Now(), Waiting: "Claude usage limit: runs again after " + reset.UTC().Format("15:04 MST")})
 		time.Sleep(time.Until(reset))
 	}
 }
@@ -174,6 +178,8 @@ func (o *project) runOnce(role string, is issue, feedback string) (bool, string,
 	var steps []string
 	var result *streamEvent
 	var lastEdit time.Time
+	activityKey := fmt.Sprintf("%s#%d", o.name, is.Number)
+	o.setActivity(activityKey, &agentActivity{Role: role, Started: time.Now()})
 	scanner := bufio.NewScanner(stdout)
 	scanner.Buffer(make([]byte, 64*1024), 16*1024*1024) // tool results can embed whole files in one line
 	for scanner.Scan() {
@@ -181,7 +187,10 @@ func (o *project) runOnce(role string, is issue, feedback string) (bool, string,
 		if event.Type == "result" {
 			result = &event
 		}
-		steps = append(steps, describe(event)...)
+		if lines := describe(event); len(lines) > 0 {
+			steps = append(steps, lines...)
+			o.setSteps(activityKey, steps)
+		}
 		if time.Since(lastEdit) > editEvery {
 			// The progress comment is cosmetic: a failed edit must not kill the run.
 			if err := o.gitea.editComment(commentID, progress(role, is.Number, steps)); err != nil {
@@ -206,4 +215,33 @@ func (o *project) runOnce(role string, is issue, feedback string) (bool, string,
 		final = result.Result
 	}
 	return exitCode == 0, final, nil
+}
+
+// agentActivity is what an issue's agent does now, as the UI shows it.
+type agentActivity struct {
+	Role    string    `json:"role"`
+	Started time.Time `json:"started"`
+	Steps   []string  `json:"steps"`             // the last maxSteps
+	Total   int       `json:"total"`             // steps so far
+	Waiting string    `json:"waiting,omitempty"` // why it is paused, if it is
+}
+
+// setActivity records an issue's agent activity; nil clears it.
+func (f *forge) setActivity(key string, a *agentActivity) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if a == nil {
+		delete(f.activity, key)
+	} else {
+		f.activity[key] = a
+	}
+}
+
+func (f *forge) setSteps(key string, steps []string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if a := f.activity[key]; a != nil {
+		a.Steps = slices.Clone(steps[max(0, len(steps)-maxSteps):])
+		a.Total = len(steps)
+	}
 }

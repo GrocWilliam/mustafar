@@ -23,7 +23,7 @@ services:
     env_file: .env
     depends_on: [gitea]
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000" # localhost only: the forge UI's buttons start paid agent runs
     volumes:
       # The Docker socket is root on the host, :ro or not (see AGENT.md, Security).
       - /var/run/docker.sock:/var/run/docker.sock

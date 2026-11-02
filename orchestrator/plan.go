@@ -25,6 +25,8 @@ var (
 	partOfLine  = regexp.MustCompile(`(?mi)^part of #(\d+)`)
 	planMarker  = regexp.MustCompile(`<!-- forge:stories ([\d,]+) -->`)
 	costMarker  = regexp.MustCompile(`<!-- forge:cost=([\d.]+) -->`)
+	// budgetMarker on a spec comment overrides MAX_COST_PER_SPEC for that spec; the last one wins.
+	budgetMarker = regexp.MustCompile(`<!-- forge:budget=([\d.]+) -->`)
 )
 
 // parsePlan extracts the stories from the last ```json block of the planner's final message and validates them.
@@ -110,4 +112,20 @@ func sumCosts(comments []string) float64 {
 		}
 	}
 	return total
+}
+
+// specBudget returns the budget set by the last budget marker in a spec's comments, or fallback.
+func specBudget(comments []string, fallback float64) float64 {
+	for i := len(comments) - 1; i >= 0; i-- {
+		if match := budgetMarker.FindStringSubmatch(comments[i]); match != nil {
+			if budget, err := strconv.ParseFloat(match[1], 64); err == nil {
+				return budget
+			}
+		}
+	}
+	return fallback
+}
+
+func budgetMarkerFor(budget float64) string {
+	return fmt.Sprintf("<!-- forge:budget=%.2f -->", budget)
 }

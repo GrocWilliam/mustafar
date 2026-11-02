@@ -44,7 +44,8 @@ The orchestrator is one Go binary, standard library only, that polls Gitea every
 | `checks.go` | Pure merge checks: reviewer verdict, frozen tests, protected paths |
 | `land.go` | Serialized merge: update the branch from `main`, rerun CI, squash-merge, deploy |
 | `deploy.go` | Build and run the staging container, health check, revert |
-| `agent_runner.go` | Starts an agent container and mirrors its stream into one Gitea comment |
+| `agent_runner.go` | Starts an agent container and mirrors its stream into one Gitea comment, and into the live activity the UI shows |
+| `ui.go`, `ui.html` | The forge UI on `:8000`: the page, `GET /api/state`, and the actions `POST /api/retry`, `/api/budget`, `/api/spec` |
 | `limit.go` | Reads the Claude usage-limit message and its reset time: `runAgent` waits for it and reruns the agent |
 | `api.go`, `gitea*.go`, `docker.go` | One shared JSON HTTP client; Gitea REST and Docker Engine over its Unix socket |
 | `config.go` | Environment variables and their validation |
@@ -168,7 +169,22 @@ The orchestrator keeps no database: everything it must remember across restarts 
 
 ### Budget
 
-`specCost` adds every `forge:cost` marker on the spec and on each story listed in its plan marker (`<!-- forge:stories 12,13,14 -->`), retries included. `readyStories` computes it once per spec per poll. Above `MAX_COST_PER_SPEC`, `stopSpec` blocks the spec and its stories still in `us-todo`; stories already running finish their current pipeline.
+`specCost` adds every `forge:cost` marker on the spec and on each story listed in its plan marker (`<!-- forge:stories 12,13,14 -->`), retries included. `readyStories` computes it once per spec per poll. The budget is `MAX_COST_PER_SPEC`, unless the spec carries a budget marker (`<!-- forge:budget=35.00 -->`, posted by the UI's budget form; the last one wins). Above it, `stopSpec` blocks the spec and its stories still in `us-todo`; stories already running finish their current pipeline.
+
+### The forge UI (`ui.go`)
+
+`GET /` serves `ui.html`, embedded in the binary. The page polls `GET /api/state` every 5 seconds. The state is built from Gitea on each request: every issue of every ready project (open and closed), then the comments of the specs and of their stories, cached per issue by `updated_at` and for 10 seconds at most while the issue is open. A spec is an issue labelled `spec` or `spec-active`, or one that a story names in its `Part of` line; its stories come in plan order, then those added by hand. `progressOf` derives a story's step from its labels and the orchestrator's own comments. Live agent steps come from memory: `runAgent` records them in `forge.activity` as the stream arrives.
+
+The actions change Gitea the way a human would, then let the poll loop pick up the change:
+
+| Action | Effect |
+| --- | --- |
+| `POST /api/retry {project, number}` | Blocked story → `us-todo`. Blocked spec without a plan → `spec`; with one → `spec-active` and its blocked stories → `us-todo`, refused while the spec is over budget |
+| `... {fresh: true}` | Also closes the story's pull request and deletes `agent/us-<n>`: the tester starts over |
+| `POST /api/budget {project, number, budget}` | Posts a budget marker on the spec ($0 to $1000) |
+| `POST /api/spec {project, title, body}` | Opens an issue labelled `spec` |
+
+Every action requires the `X-Forge-UI: 1` header: a page from another origin cannot add it without a CORS preflight, which the server never answers, so a malicious site cannot trigger paid runs through the browser. Compose publishes `:8000` on `127.0.0.1` only. There is no login: anyone with a shell on the host can use it.
 
 ### Recovery after a restart
 
@@ -231,7 +247,7 @@ The `forge-setup` skill reruns these steps safely; the commands below are what i
 | Changed `.env` | `docker compose up -d orchestrator` |
 | Changed `templates/ci.yml` | One pull request per project, merged in the web UI: `main` refuses pushes |
 | New project | `./new-project.sh NAME [SPEC_FILE]` |
-| Health | `curl localhost:8000/health` lists what runs now |
+| Health | The forge UI at http://localhost:8000, or `curl localhost:8000/health` for what runs now |
 | Logs | `docker compose logs -f orchestrator runner` |
 
 Restarting the orchestrator restarts every story in flight, so check `/health` first. The orchestrator image build runs `go vet` and the tests, so a failing test blocks the deploy.

@@ -75,7 +75,8 @@ Your job is to write good specs and to unblock what stops; everything between th
 3. **Or write a single story.** For a small change, open an issue labelled `us-todo` with explicit acceptance criteria. It skips planning.
 4. **Follow progress in Gitea.** Each agent run shows one comment, edited live with its latest steps, then replaced by a summary with turns and cost. The spec's plan comment lists the stories in build order.
 5. **Try it on staging.** Once the project has a `Dockerfile`, each merge is deployed to `http://localhost:<9000 + repo id>`; the 🚀 comment gives the URL.
-6. **Check status.** `curl localhost:8000/health` lists what runs now; the `forge-status` skill reports projects, blocked issues and spend.
+6. **Check status.** The forge UI at http://localhost:8000 shows every project, spec and story, live: each story's pipeline step (Queued, Tests, Code, CI, Review, Merge, Done), its attempt and cost, what its agent is doing right now, and each spec's progress and spend against its budget. It refreshes every 5 seconds. The `forge-status` skill gives the same report in Claude Code.
+7. **Act from the UI.** Its buttons retry a blocked story (resuming its branch) or retry it from scratch (branch and pull request deleted), retry a blocked spec, set one spec's budget, and open a new spec. Each one asks for confirmation, since it starts paid agent runs. The UI listens on localhost only.
 
 The comments to recognise on an issue:
 
@@ -113,9 +114,9 @@ To resume, read the last ⛔ comment, fix the cause, then set the label back:
 | --- | --- | --- |
 | Story | Sharpen its acceptance criteria, or fix the infrastructure | `us-todo` (resumes its branch; delete `agent/us-<n>` to start over from the tester) |
 | Spec, planning failed | Make the spec clearer or smaller (20 stories at most) | `spec` |
-| Spec, over budget | Raise `MAX_COST_PER_SPEC` and restart the orchestrator | `spec-active`, then `us-todo` on its blocked stories |
+| Spec, over budget | Raise its budget in the forge UI (or `MAX_COST_PER_SPEC` for every spec, then restart the orchestrator) | Retry spec in the UI, or `spec-active` then `us-todo` on its blocked stories |
 
-The `forge-unblock` skill does the diagnosis with you and asks before relabelling, since a retry starts paid agent runs again.
+The forge UI has a button for each of these retries. The `forge-unblock` skill does the diagnosis with you and asks before relabelling, since a retry starts paid agent runs again.
 
 ## Limits and known risks
 

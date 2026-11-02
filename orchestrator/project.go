@@ -48,7 +48,9 @@ func (o *project) poll() error {
 		if err := o.recover(); err != nil {
 			return err
 		}
+		o.pmu.Lock() // the UI handlers read both
 		o.base, o.ready = base, true
+		o.pmu.Unlock()
 	}
 	if err := o.closeFinishedSpecs(); err != nil {
 		return err

@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io"
+	"net/http"
 	"net/url"
 	"sort"
 )
@@ -91,4 +92,13 @@ func (g *gitea) forgeRepos(topic string) ([]repoInfo, error) {
 	err := g.call("GET", "/repos/search?topic=true&limit=50&q="+url.QueryEscape(topic), nil, &found)
 	sort.Slice(found.Data, func(i, j int) bool { return found.Data[i].FullName < found.Data[j].FullName })
 	return found.Data, err
+}
+
+// deleteBranch deletes branch; a branch already gone is not an error.
+func (g *gitea) deleteBranch(branch string) error {
+	err := g.call("DELETE", "/branches/"+url.PathEscape(branch), nil, nil)
+	if hasStatus(err, http.StatusNotFound) {
+		return nil
+	}
+	return err
 }

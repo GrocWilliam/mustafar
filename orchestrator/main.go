@@ -16,13 +16,18 @@ const projectTopic = "forge"
 
 // forge holds what all projects share: the agent slots and the Docker engine.
 type forge struct {
-	cfg      config
-	root     *gitea // API root, to discover the projects
-	docker   *dockerEngine
-	projects map[string]*project // by full name, only touched by the poll loop
+	cfg    config
+	root   *gitea // API root, to discover the projects
+	docker *dockerEngine
+	// projects, by full name, are added by the poll loop and read by the UI handlers under pmu.
+	pmu      sync.RWMutex
+	projects map[string]*project
 	// running holds the issues being worked on, as `owner/repo#n`: the only lock, rebuilt empty on startup.
-	mu      sync.Mutex
-	running map[string]bool
+	// activity holds what their agent does now, for the UI. Both under mu.
+	mu       sync.Mutex
+	running  map[string]bool
+	activity map[string]*agentActivity
+	comments commentCache // for the UI
 }
 
 func main() {
@@ -36,6 +41,8 @@ func main() {
 		docker:   newDocker("/var/run/docker.sock"),
 		projects: map[string]*project{},
 		running:  map[string]bool{},
+		activity: map[string]*agentActivity{},
+		comments: commentCache{entries: map[string]cachedComments{}},
 	}
 	// Agents of a previous run would keep pushing to the branches of the US that recover() restarts.
 	if n, err := f.docker.removeAgents(); err != nil {
@@ -45,6 +52,7 @@ func main() {
 	}
 	go f.loop()
 
+	f.serveUI()
 	http.HandleFunc("GET /health", func(w http.ResponseWriter, _ *http.Request) {
 		f.mu.Lock()
 		running := []string{}
@@ -75,10 +83,14 @@ func (f *forge) poll() {
 		return
 	}
 	for _, repo := range repos {
+		f.pmu.RLock()
 		p := f.projects[repo.FullName]
+		f.pmu.RUnlock()
 		if p == nil {
 			p = newProject(f, repo)
+			f.pmu.Lock()
 			f.projects[repo.FullName] = p
+			f.pmu.Unlock()
 			log.Printf("%s: new project", repo.FullName)
 		}
 		if err := p.poll(); err != nil {
