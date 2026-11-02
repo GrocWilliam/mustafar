@@ -114,6 +114,7 @@ Decisions so far:
 ├── AGENT.md
 ├── README.md                 # setup steps
 ├── new-project.sh            # create a project (repo, deploy key, CI, topic) and optionally open its spec
+├── mirror.sh                 # push-mirror a project to GitHub, GitLab, Azure DevOps or any HTTPS git remote
 ├── examples/url-shortener/   # spec.md + WALKTHROUGH.md: every step of the forge on one project
 ├── .claude/skills/           # forge-setup, forge-spec, forge-status, forge-unblock (Claude Code skills to run the forge)
 ├── docker-compose.yml        # gitea, runner, orchestrator; shared network `forge`

@@ -247,6 +247,7 @@ The `forge-setup` skill reruns these steps safely; the commands below are what i
 | Changed `.env` | `docker compose up -d orchestrator` |
 | Changed `templates/ci.yml` | One pull request per project, merged in the web UI: `main` refuses pushes |
 | New project | `./new-project.sh NAME [SPEC_FILE]` |
+| Mirror a project out | `MIRROR_TOKEN=... ./mirror.sh NAME https://host/owner/repo.git` |
 | Health | The forge UI at http://localhost:8000, or `curl localhost:8000/health` for what runs now |
 | Logs | `docker compose logs -f orchestrator runner` |
 

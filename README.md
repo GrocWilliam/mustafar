@@ -62,6 +62,8 @@ Check it is up: `curl localhost:8000/health`.
 
 Every Gitea repo with the `forge` topic is a project. Add one with `./new-project.sh NAME [SPEC_FILE]`, no restart needed; with a spec file it also opens it as a `spec` issue.
 
+To keep a copy on GitHub, GitLab, Azure DevOps or any HTTPS git host, create an empty repo there and run `MIRROR_TOKEN=<token with write access> ./mirror.sh NAME https://host/owner/repo.git` (for GitLab add `MIRROR_USER=oauth2`). Gitea then pushes every branch and tag on each commit. It is one-way: issues and specs stay in Gitea, and anything pushed to the remote directly is overwritten.
+
 Worked example with every step shown: [`examples/url-shortener/WALKTHROUGH.md`](examples/url-shortener/WALKTHROUGH.md) (`./new-project.sh shortener examples/url-shortener/spec.md`).
 
 ### Build a feature: `spec` label
