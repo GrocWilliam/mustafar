@@ -72,11 +72,31 @@ func (d *dockerEngine) run(image, network string, env []string) (string, error) 
 	var created struct {
 		ID string `json:"Id"`
 	}
-	spec := map[string]any{"Image": image, "Env": env, "HostConfig": map[string]any{"NetworkMode": network}}
+	spec := map[string]any{"Image": image, "Env": env, "Labels": map[string]string{agentLabel: "1"}, "HostConfig": map[string]any{"NetworkMode": network}}
 	if err := d.call("POST", "/containers/create", spec, &created); err != nil {
 		return "", err
 	}
 	return created.ID, d.call("POST", "/containers/"+created.ID+"/start", nil, nil)
+}
+
+// agentLabel marks the one-shot agent containers, so a restarted orchestrator can remove the ones its previous run left.
+const agentLabel = "forge.agent"
+
+// removeAgents force-removes every agent container, running or not, and returns how many it removed.
+func (d *dockerEngine) removeAgents() (int, error) {
+	var containers []struct {
+		ID string `json:"Id"`
+	}
+	filter := url.QueryEscape(`{"label":["` + agentLabel + `"]}`)
+	if err := d.call("GET", "/containers/json?all=1&filters="+filter, nil, &containers); err != nil {
+		return 0, err
+	}
+	for i, c := range containers {
+		if err := d.remove(c.ID); err != nil {
+			return i, err
+		}
+	}
+	return len(containers), nil
 }
 
 // build builds an image from a tar build context. Build failures arrive inside the JSON stream, not as a status.

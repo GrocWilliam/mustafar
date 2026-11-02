@@ -21,7 +21,7 @@ api() { curl -sf -X "$1" "http://gitea:3000/api/v1$2" -u "forge:$(cat secrets/gi
    `api GET "/repos/$repo/issues?state=open&type=issues&limit=50&labels=$label"`.
 4. Per `us-blocked` issue: its last comment starting with `⛔ Blocked:` (`api GET "/repos/$repo/issues/$n/comments"`) is the reason.
 5. Per `spec-active` spec, if the user asks about progress or cost:
-   - its stories are the numbers in the `<!-- forge:stories 2,3,4 -->` marker of its plan comment; count how many are closed;
+   - its stories are the numbers in the `<!-- forge:stories 2,3,4 -->` marker of its last plan comment; count how many are closed;
    - spend = sum of every `<!-- forge:cost=X -->` in the comments of the spec and of its stories. Compare with `MAX_COST_PER_SPEC` (`grep -E '^MAX_COST_PER_SPEC=' .env`, default 20).
 6. Recent errors: `docker compose logs --since 30m orchestrator | grep -iE 'fail|error|blocked' | tail -20`.
 

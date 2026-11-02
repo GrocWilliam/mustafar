@@ -44,16 +44,20 @@ func (o *project) planSpec(spec issue) error {
 		lines = append(lines, line)
 	}
 
-	for _, number := range created {
-		if err := o.gitea.label(number, "us-todo"); err != nil {
-			return o.abandonPlan(spec.Number, created, fmt.Sprintf("labelling the stories failed: `%v`", err))
-		}
-	}
+	// The spec leaves `spec` before any story can start, so a failure here never plans it twice.
 	plan := fmt.Sprintf("📋 Plan: %d stories, built in this order.\n\n%s\n\n%s", len(created), strings.Join(lines, "\n"), planMarkerFor(created))
 	if _, err := o.gitea.comment(spec.Number, plan); err != nil {
-		return err
+		return o.abandonPlan(spec.Number, created, fmt.Sprintf("posting the plan failed: `%v`", err))
 	}
-	return o.gitea.move(spec.Number, "spec", "spec-active")
+	if err := o.gitea.move(spec.Number, "spec", "spec-active"); err != nil {
+		return o.abandonPlan(spec.Number, created, fmt.Sprintf("marking the spec active failed: `%v`", err))
+	}
+	for _, number := range created {
+		if err := o.gitea.label(number, "us-todo"); err != nil {
+			return o.block(spec.Number, "spec-active", fmt.Sprintf("labelling the stories failed: `%v`. Set `us-todo` on the plan's stories that lack it, then set `spec-active` again.", err))
+		}
+	}
+	return nil
 }
 
 // abandonPlan closes the stories of a plan that could not be created in full, so that retrying the spec does not duplicate them.
