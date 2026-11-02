@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log"
 	"os"
 	"strconv"
@@ -175,12 +174,7 @@ func (o *project) runAgent(role string, is issue, feedback string) (bool, string
 	if err != nil {
 		return false, "", err
 	}
-	var stderr []byte
-	if logs, err := o.docker.logs(id, "stderr=1&tail=20"); err == nil {
-		stderr, _ = io.ReadAll(logs)
-		logs.Close()
-	}
-	if err := o.gitea.editComment(commentID, summary(role, steps, result, exitCode, strings.TrimSpace(string(stderr)))); err != nil {
+	if err := o.gitea.editComment(commentID, summary(role, steps, result, exitCode, o.docker.stderrTail(id, 20))); err != nil {
 		return false, "", err
 	}
 	final := ""

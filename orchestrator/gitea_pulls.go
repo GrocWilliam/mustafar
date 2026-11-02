@@ -3,7 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
-	"strings"
+	"net/http"
 	"time"
 )
 
@@ -63,7 +63,7 @@ func (g *gitea) merge(pr int, title, head string) error {
 	}
 	for tries := 1; ; tries++ {
 		err := g.call("POST", fmt.Sprintf("/pulls/%d/merge", pr), body, nil)
-		if err == nil || tries >= mergeTries || !strings.Contains(err.Error(), " 405 ") {
+		if err == nil || tries >= mergeTries || !hasStatus(err, http.StatusMethodNotAllowed) {
 			return err
 		}
 		time.Sleep(mergeRetry)
@@ -94,7 +94,7 @@ var errConflict = errors.New("merge conflict")
 // updatePR merges the base branch into the pull request's branch, server side. Gitea answers 409 on conflicts.
 func (g *gitea) updatePR(pr int) error {
 	err := g.call("POST", fmt.Sprintf("/pulls/%d/update?style=merge", pr), nil, nil)
-	if err != nil && strings.Contains(err.Error(), "409 Conflict") {
+	if hasStatus(err, http.StatusConflict) {
 		return errConflict
 	}
 	return err
