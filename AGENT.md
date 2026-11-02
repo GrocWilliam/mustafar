@@ -11,7 +11,7 @@ A local, **autonomous** software forge: I write a spec, headless Claude Code age
 - **gitea** — forge, work queue and source of truth (issues, labels, PRs, history). Ports 3000 (web), 2222 (SSH).
 - **act_runner** — Gitea Actions: CI (tests) only, without the Docker socket. Deterministic, no LLM.
 - **orchestrator** — Go, standard library only (Gitea and Docker Engine APIs over plain HTTP), port 8000. The only process that changes labels. Dispatches tasks to agents, applies merge rules, manages retries and budgets, deploys to staging and reverts.
-- **agent** — one-shot container (Node 20 + `@anthropic-ai/claude-code` + git), one role per run: `planner`, `tester`, `dev`, `reviewer`.
+- **agent** — one-shot container (Node 26 + `@anthropic-ai/claude-code` + git), one role per run: `planner`, `tester`, `dev`, `reviewer`.
 - **staging** — one container per project, `forge-staging-<owner>-<repo>`, built from its `Dockerfile` after each merge, on `localhost:<9000 + repo id>` (the app listens on 8080 inside).
 - **projects** — every repository tagged with the `forge` topic that the orchestrator's token sees, discovered on each poll (`./new-project.sh` creates one). Agent slots (`MAX_AGENTS`) are shared by all projects; merges are serialized per project.
 
@@ -105,7 +105,7 @@ Decisions so far:
 - CI (`templates/ci.yml`, protected) runs `make test`, then, in a second job from a fresh checkout so `make test` cannot rewrite them, every `tests/acceptance/*/run.sh` itself: the dev owns the Makefile but cannot drop the acceptance tests from CI. Merged acceptance tests become the regression suite.
 - Gitea's `ROOT_URL` is `http://gitea:3000` everywhere (host via `/etc/hosts`) so CI checkouts work from job containers.
 - Deployment (`deploy.go`), still under the merge lock, so each merge gets its verdict before the next: if the merged `main` has a `Dockerfile`, the orchestrator downloads its archive from Gitea, builds `forge-app/<owner>/<repo>:<sha>` through the Docker API and replaces the project's staging container (network `forge`, `127.0.0.1:<9000 + repo id>`). No `Dockerfile` = nothing to deploy. If the build, the start or `GET /health` fails, a one-shot agent container with `ROLE=revert` runs plain `git revert` and pushes it to `revert/<sha>` with the deploy key (no Claude), the orchestrator opens a pull request from it and merges it without waiting for CI (retrying for 30 s while Gitea still checks the new pull request), the previous `main` is redeployed, and the US is reopened and blocked with the reason. Retrying it starts over from the reverted `main`.
-- CI job containers never get the Docker socket (`docker_host: "-"`). Agents and CI use the same toolchain: CI jobs run in `forge-ci` (`ci/Dockerfile`: `node:20-bookworm` + Debian Chromium at `$CHROMIUM_PATH`, for browser tests), and the agent image is built on it.
+- CI job containers never get the Docker socket (`docker_host: "-"`). Agents and CI use the same toolchain: CI jobs run in `forge-ci` (`ci/Dockerfile`: `node:26-bookworm` + Debian Chromium at `$CHROMIUM_PATH`, for browser tests), and the agent image is built on it.
 
 ## Files (M1 – M6)
 

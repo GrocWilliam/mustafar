@@ -75,7 +75,7 @@ Only the orchestrator writes labels; the label is a trace of the state, not a lo
 
 Each agent run is a fresh `forge-agent` container: it clones the repository, runs `claude -p` once in one role, pushes its branch, and is removed.
 
-The image is `forge-ci`, the CI jobs' image (`ci/Dockerfile`: `node:20-bookworm` plus Debian Chromium at `$CHROMIUM_PATH`), plus `@anthropic-ai/claude-code`, `agents/agent.sh` as entrypoint, and the prompts in `/prompts`. It runs as the `node` user, because Claude Code refuses `bypassPermissions` as root.
+The image is `forge-ci`, the CI jobs' image (`ci/Dockerfile`: `node:26-bookworm` plus Debian Chromium at `$CHROMIUM_PATH`), plus `@anthropic-ai/claude-code`, `agents/agent.sh` as entrypoint, and the prompts in `/prompts`. It runs as the `node` user, because Claude Code refuses `bypassPermissions` as root.
 
 The orchestrator passes everything through environment variables: `ROLE`, `REPO_URL`, `DEPLOY_KEY`, `ISSUE_NUMBER`, `ISSUE_TITLE`, `ISSUE_BODY`, `FEEDBACK`, plus `ANTHROPIC_API_KEY` or `CLAUDE_CODE_OAUTH_TOKEN`. Containers carry the label `forge.agent` and join the `forge` network.
 
