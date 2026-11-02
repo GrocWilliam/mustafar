@@ -1,6 +1,6 @@
 # act_runner settings; unset keys keep act_runner's defaults.
 runner:
-  capacity: 2 # keep >= MAX_AGENTS, or parallel stories queue for CI
+  capacity: 4 # each commit runs 2 jobs (test, acceptance): keep >= 2 × MAX_AGENTS, or parallel stories queue for CI
   labels:
     - "ubuntu-latest:docker://forge-ci" # built locally (ci/Dockerfile): the same toolchain as the agents
 container:

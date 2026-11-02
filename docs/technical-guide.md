@@ -186,7 +186,7 @@ There is deliberately no timeout-based requeue: a slow agent must not be duplica
 | `GITEA_TOKEN` | required | Orchestrator API token (`write:repository,write:issue`). Never given to agents. |
 | `GITEA_RUNNER_REGISTRATION_TOKEN` | none | Registers `act_runner` |
 | `POLL_SECONDS` | 30 | Poll and CI-wait interval. Must be at least 1. |
-| `MAX_AGENTS` | 1 in code, 2 in `.env.example` | Specs and stories worked on at once, all projects. Keep `runner/config.yaml` capacity at least as high. |
+| `MAX_AGENTS` | 1 in code, 2 in `.env.example` | Specs and stories worked on at once, all projects. Keep `runner/config.yaml` capacity at least twice as high: each commit runs 2 CI jobs. |
 | `MAX_COST_PER_SPEC` | 20 | USD per spec, as reported by Claude Code |
 | `PROTECTED_PATHS` | `.gitea/` | Comma-separated path prefixes a pull request must not touch |
 | `GITEA_URL`, `GITEA_SSH_URL` | `http://gitea:3000`, `ssh://git@gitea:22/` | Inside the compose network |
@@ -247,7 +247,7 @@ Unit tests cover the pure parts: stream parsing and summaries (`agent_runner_tes
 | `protecting main: ... 403` in the logs | Token cannot create branch protection | Regenerate `GITEA_TOKEN` with more rights |
 | Story blocked: `no CI result after 30m` | Runner down or not registered | `docker compose up -d runner`; it can lose a race with Gitea at boot |
 | Stories wait while slots are free | Dependencies still open, or spec over budget | Check `Depends on` issues and the spec's ⛔ comment |
-| Parallel stories queue in CI | Runner `capacity` below `MAX_AGENTS` | Raise `capacity` in `runner/config.yaml` |
+| Parallel stories queue in CI | Runner `capacity` below 2 × `MAX_AGENTS` | Raise `capacity` in `runner/config.yaml` |
 | Disk filling up | Deployed images are never pruned | Remove old `forge-app/*` images |
 
 The `forge-status` and `forge-unblock` skills automate the reading and the retry.
