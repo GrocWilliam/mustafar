@@ -72,7 +72,7 @@ func (o *project) resume(is issue, branch string) (base, tester map[string]strin
 	if tester, err = o.gitea.tree(testerSHA); err != nil {
 		return nil, nil, false, err
 	}
-	msg := fmt.Sprintf("♻️ Resuming `%s`: the tester's acceptance tests (%.12s) and the dev's earlier work are kept, the dev continues. Delete the branch to start over from the tester.", branch, testerSHA)
+	msg := fmt.Sprintf("♻️ Resuming `%s`: the tester's acceptance tests (%.12s) and the dev's earlier work are kept; its last commit goes through CI and review again, and the dev continues only if they reject it. Delete the branch to start over from the tester.", branch, testerSHA)
 	_, err = o.gitea.comment(is.Number, msg)
 	return base, tester, true, err
 }

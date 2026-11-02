@@ -57,17 +57,21 @@ func (o *project) deliver(is issue, label *string) error {
 				return err
 			}
 		}
-		if feedback, err = o.attempt(is, branch, baseTree, testerTree, feedback, label); err != nil || feedback == "" {
+		// A resumed branch may already hold finished work (e.g. a restart between CI and review): check it before rerunning the dev.
+		skipDev := resumed && attempt == 1
+		if feedback, err = o.attempt(is, branch, baseTree, testerTree, feedback, label, skipDev); err != nil || feedback == "" {
 			return err
 		}
 	}
 	return fmt.Errorf("still rejected after %d attempts. Last feedback:\n\n%s", maxAttempts, feedback)
 }
 
-// attempt runs one dev cycle and its checks. It returns the feedback for the next cycle, or "" once merged.
+// attempt runs one dev cycle and its checks (only the checks when skipDev). It returns the feedback for the next cycle, or "" once merged.
 // An error means the US cannot go on (infrastructure failure or misbehaving agent).
-func (o *project) attempt(is issue, branch string, baseTree, testerTree map[string]string, feedback string, label *string) (string, error) {
-	if ok, final, err := o.runAgent("dev", is, feedback); err != nil {
+func (o *project) attempt(is issue, branch string, baseTree, testerTree map[string]string, feedback string, label *string, skipDev bool) (string, error) {
+	if skipDev {
+		// the branch head is the dev's earlier work: straight to the checks
+	} else if ok, final, err := o.runAgent("dev", is, feedback); err != nil {
 		return "", err
 	} else if !ok {
 		// Its own explanation (a contradiction in the tests, a missing tool...) beats a generic retry message.

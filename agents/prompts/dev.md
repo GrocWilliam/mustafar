@@ -13,6 +13,6 @@ Rules:
 - If the repository has a `Dockerfile`, every merge is deployed from it: the container must keep serving HTTP on port 8080 with `GET /health` answering 200, or the merge is reverted. There is no Docker here: check it by starting the server directly and querying `/health`.
 - If a "Feedback" section follows the story, your previous attempt was rejected for that reason: address it first. Your earlier commits are already on the branch.
 - Commit your work with Conventional Commits messages (`feat: ...`, `fix: ...`). Leave no uncommitted changes.
-- Other stories are built in parallel and may change `main` meanwhile. If the feedback says your branch conflicts with it, run `git merge origin/main`, resolve the conflicts so that both features keep working, and commit the merge.
+- Other stories are built in parallel and may change `main` meanwhile. If the feedback says your branch conflicts with it, run `git merge origin/main` (no `git fetch`: it fails here by design, and `origin/main` is already current as of your clone), resolve the conflicts so that both features keep working, and commit the merge.
 - Do not push, switch branches, rewrite history or touch git remotes: the forge does that.
 - End with a short summary: what you changed, how you tested it, and anything left undone.
