@@ -46,7 +46,7 @@ func TestRefsAndMarkers(t *testing.T) {
 	if got := refs(partOfLine, body); !reflect.DeepEqual(got, []int{7}) {
 		t.Fatalf("part of = %v", got)
 	}
-	comments := []string{"hello", "📋 Plan\n\n" + planMarkerFor([]int{8, 9, 10})}
+	comments := []string{"hello", "abandoned " + planMarkerFor([]int{5, 6}), "📋 Plan\n\n" + planMarkerFor([]int{8, 9, 10}), "later"}
 	if got := planStories(comments); !reflect.DeepEqual(got, []int{8, 9, 10}) {
 		t.Fatalf("planStories = %v", got)
 	}

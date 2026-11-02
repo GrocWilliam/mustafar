@@ -137,7 +137,7 @@ func (o *project) ensurePR(is issue, branch string) (*pullRequest, error) {
 	if err != nil || pr != nil {
 		return pr, err
 	}
-	if pr, err = o.gitea.openPR(is.Title, fmt.Sprintf("Closes #%d", is.Number), branch); err != nil {
+	if pr, err = o.gitea.openPR(is.Title, fmt.Sprintf("Closes #%d", is.Number), branch, o.base); err != nil {
 		return nil, err
 	}
 	_, err = o.gitea.comment(is.Number, "🔀 Pull request opened: "+pr.HTMLURL)

@@ -37,6 +37,12 @@ func main() {
 		projects: map[string]*project{},
 		running:  map[string]bool{},
 	}
+	// Agents of a previous run would keep pushing to the branches of the US that recover() restarts.
+	if n, err := f.docker.removeAgents(); err != nil {
+		log.Fatalf("removing leftover agent containers: %v", err)
+	} else if n > 0 {
+		log.Printf("removed %d leftover agent container(s)", n)
+	}
 	go f.loop()
 
 	http.HandleFunc("GET /health", func(w http.ResponseWriter, _ *http.Request) {

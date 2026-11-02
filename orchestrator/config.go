@@ -46,7 +46,12 @@ func loadConfig() (config, error) {
 	if c.MaxAgents, err = strconv.Atoi(env("MAX_AGENTS", "1")); err != nil || c.MaxAgents < 1 {
 		return c, fmt.Errorf("MAX_AGENTS must be a positive integer")
 	}
-	c.Protected = strings.Split(env("PROTECTED_PATHS", ".gitea/"), ",")
+	for _, prefix := range strings.Split(env("PROTECTED_PATHS", ".gitea/"), ",") {
+		// An untrimmed " Makefile" would match nothing, an empty prefix every file.
+		if prefix = strings.TrimSpace(prefix); prefix != "" {
+			c.Protected = append(c.Protected, prefix)
+		}
+	}
 	if c.MaxCostPerSpec, err = strconv.ParseFloat(env("MAX_COST_PER_SPEC", "20"), 64); err != nil {
 		return c, fmt.Errorf("MAX_COST_PER_SPEC: %w", err)
 	}

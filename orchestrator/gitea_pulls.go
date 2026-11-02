@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 )
 
 type pullRequest struct {
@@ -30,14 +31,10 @@ func (g *gitea) findPR(branch string) (*pullRequest, error) {
 	return nil, nil
 }
 
-// openPR opens a pull request from branch to the default branch.
-func (g *gitea) openPR(title, body, branch string) (*pullRequest, error) {
-	base, err := g.defaultBranch()
-	if err != nil {
-		return nil, err
-	}
+// openPR opens a pull request from branch to base.
+func (g *gitea) openPR(title, body, branch, base string) (*pullRequest, error) {
 	var pr pullRequest
-	err = g.call("POST", "/pulls", map[string]string{
+	err := g.call("POST", "/pulls", map[string]string{
 		"head":  branch,
 		"base":  base,
 		"title": title,
@@ -56,14 +53,24 @@ func (g *gitea) ciState(sha string) (string, error) {
 }
 
 // merge squash-merges pr, only if its branch is still at head: what was checked is what gets merged.
+// Gitea answers 405 until its background check of a new or updated pull request is done: retry for a while.
 func (g *gitea) merge(pr int, title, head string) error {
-	return g.call("POST", fmt.Sprintf("/pulls/%d/merge", pr), map[string]any{
+	body := map[string]any{
 		"Do":                        "squash",
 		"MergeTitleField":           title,
 		"head_commit_id":            head,
 		"delete_branch_after_merge": true,
-	}, nil)
+	}
+	for tries := 1; ; tries++ {
+		err := g.call("POST", fmt.Sprintf("/pulls/%d/merge", pr), body, nil)
+		if err == nil || tries >= mergeTries || !strings.Contains(err.Error(), " 405 ") {
+			return err
+		}
+		time.Sleep(mergeRetry)
+	}
 }
+
+var mergeTries, mergeRetry = 30, time.Second // variables so tests need not wait
 
 func (g *gitea) closeIssue(number int) error {
 	return g.call("PATCH", fmt.Sprintf("/issues/%d", number), map[string]string{"state": "closed"}, nil)

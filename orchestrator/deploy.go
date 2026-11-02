@@ -156,7 +156,7 @@ func (o *project) revert(sha, title string) error {
 		}
 		return fmt.Errorf("git revert exited with %d: %s", code, strings.TrimSpace(string(stderr)))
 	}
-	pr, err := o.gitea.openPR(title, "Reverts "+sha+": its staging deployment failed.", branch)
+	pr, err := o.gitea.openPR(title, "Reverts "+sha+": its staging deployment failed.", branch, o.base)
 	if err != nil {
 		return err
 	}

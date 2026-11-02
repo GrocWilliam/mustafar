@@ -84,10 +84,10 @@ func planMarkerFor(stories []int) string {
 	return "<!-- forge:stories " + strings.Join(parts, ",") + " -->"
 }
 
-// planStories reads the story numbers from the first plan marker found in a spec's comments.
+// planStories reads the story numbers from the last plan marker in a spec's comments: a retried plan replaces an abandoned one.
 func planStories(comments []string) []int {
-	for _, body := range comments {
-		if match := planMarker.FindStringSubmatch(body); match != nil {
+	for i := len(comments) - 1; i >= 0; i-- {
+		if match := planMarker.FindStringSubmatch(comments[i]); match != nil {
 			var numbers []int
 			for _, part := range strings.Split(match[1], ",") {
 				if n, err := strconv.Atoi(part); err == nil {
