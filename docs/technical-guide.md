@@ -45,6 +45,7 @@ The orchestrator is one Go binary, standard library only, that polls Gitea every
 | `land.go` | Serialized merge: update the branch from `main`, rerun CI, squash-merge, deploy |
 | `deploy.go` | Build and run the staging container, health check, revert |
 | `agent_runner.go` | Starts an agent container and mirrors its stream into one Gitea comment |
+| `limit.go` | Reads the Claude usage-limit message and its reset time: `runAgent` waits for it and reruns the agent |
 | `api.go`, `gitea*.go`, `docker.go` | One shared JSON HTTP client; Gitea REST and Docker Engine over its Unix socket |
 | `config.go` | Environment variables and their validation |
 

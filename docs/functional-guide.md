@@ -84,6 +84,7 @@ The comments to recognise on an issue:
 | 🤖 Agent `role` | An agent run: live progress, then its summary and cost |
 | 📋 Plan | The planner's stories, in build order |
 | 🔀 Pull request opened | The story's branch is under review |
+| ⏸️ Claude usage limit reached | The agent hit the Claude usage limit; it runs again after the reset, without using an attempt |
 | 🔁 Attempt n/3 | The previous attempt was rejected; the feedback given to the dev follows |
 | 🔄 | `main` moved; the orchestrator merged it into the branch and reruns CI |
 | ✅ / 🚀 | Merged, and deployed to staging |
@@ -102,6 +103,7 @@ The forge stops itself rather than loop or spend without limit; `us-blocked` is 
 | Review | Only an explicit `VERDICT: approve` counts; the reviewer may not push | Attempt rejected, or story blocked if it pushed |
 | Budget | Agent cost per spec, retries included, capped by `MAX_COST_PER_SPEC` (default $20) | Spec and its waiting stories → `us-blocked` |
 | Agent limits | 30 turns and 45 minutes per agent run | That run fails |
+| Claude usage limit | The subscription's 5-hour or weekly limit | The agent waits for the reset and reruns; no attempt is used |
 | Staging | `GET /health` must answer 200 within one minute after a merge | Merge reverted, previous version redeployed, story → `us-blocked` |
 | Restart | Stories in progress or in review go back to `us-todo` | Story resumes its branch, or starts over if the dev had not started |
 

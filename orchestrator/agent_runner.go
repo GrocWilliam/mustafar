@@ -118,7 +118,24 @@ func summary(role string, steps []string, result *streamEvent, exitCode int, std
 // runAgent runs one agent role on an issue, mirroring its stream into a single edited comment.
 // feedback, when set, tells the agent why its previous attempt was rejected.
 // It reports whether the agent succeeded (exit code 0) and returns its final message.
+// A run stopped by the Claude usage limit is not the agent's fault: it waits for the reset and runs again,
+// so the limit never uses up a story's attempts.
 func (o *project) runAgent(role string, is issue, feedback string) (bool, string, error) {
+	for {
+		ok, final, err := o.runOnce(role, is, feedback)
+		reset, limited := limitReset(final, time.Now())
+		if ok || err != nil || !limited {
+			return ok, final, err
+		}
+		msg := fmt.Sprintf("⏸️ Claude usage limit reached: the `%s` runs again after %s.", role, reset.UTC().Format("2006-01-02 15:04 MST"))
+		if _, err := o.gitea.comment(is.Number, msg); err != nil {
+			return false, "", err
+		}
+		time.Sleep(time.Until(reset))
+	}
+}
+
+func (o *project) runOnce(role string, is issue, feedback string) (bool, string, error) {
 	key, err := os.ReadFile(o.cfg.DeployKeyFile)
 	if err != nil {
 		return false, "", err

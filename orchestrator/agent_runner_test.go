@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestParseAndDescribe(t *testing.T) {
@@ -75,5 +76,26 @@ func TestDemux(t *testing.T) {
 	var out bytes.Buffer
 	if err := demux(&stream, &out); err != nil || out.String() != "line one\nline two\n" {
 		t.Fatalf("demux = %q, %v", out.String(), err)
+	}
+}
+
+func TestLimitReset(t *testing.T) {
+	now := time.Date(2026, 11, 2, 11, 52, 0, 0, time.UTC)
+	cases := []struct {
+		final string
+		want  time.Time
+		ok    bool
+	}{
+		{"You've hit your 5-hour limit · resets 1:40pm (UTC)", time.Date(2026, 11, 2, 13, 41, 0, 0, time.UTC), true},
+		{"You've hit your 5-hour limit · resets 9am (UTC)", time.Date(2026, 11, 3, 9, 1, 0, 0, time.UTC), true},
+		{"You've hit your limit · resets 1:30pm (Europe/Paris)", time.Date(2026, 11, 2, 12, 31, 0, 0, time.UTC), true},
+		{"You've hit your weekly limit", now.Add(limitWait), true},
+		{"All tests pass.", time.Time{}, false},
+	}
+	for _, c := range cases {
+		got, ok := limitReset(c.final, now)
+		if ok != c.ok || !got.Equal(c.want) {
+			t.Errorf("limitReset(%q) = %v, %v; want %v, %v", c.final, got, ok, c.want, c.ok)
+		}
 	}
 }
