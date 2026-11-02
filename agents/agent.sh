@@ -16,6 +16,8 @@ export GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=accept-new"
 
 git clone "$REPO_URL" workspace >&2
 cd workspace
+# Local only: keep dependency and build folders out of any commit, the partial-work one below included.
+printf '%s\n' node_modules/ .svelte-kit/ __pycache__/ .venv/ >> .git/info/exclude
 git config user.name "forge-agent-${ROLE}"
 git config user.email "agent-${ROLE}@forge.local"
 if [ "$ROLE" = revert ]; then # no Claude: the orchestrator undoes a merge whose deployment failed
@@ -42,14 +44,27 @@ case "$ROLE" in planner | reviewer) unset key ;; esac # read-only roles never pu
 } > /tmp/task.md
 
 # A stalled run must not hold an agent slot until the orchestrator restarts.
+status=0
 timeout 45m claude -p "$(cat /tmp/task.md)" --permission-mode bypassPermissions \
-  --output-format stream-json --max-turns 30 --verbose
+  --output-format stream-json --max-turns 30 --verbose || status=$?
 
 # The planner and the reviewer only read: their output is their final message.
-case "$ROLE" in planner | reviewer) exit 0 ;; esac
+case "$ROLE" in planner | reviewer) exit "$status" ;; esac
+
+if [ "$status" -ne 0 ]; then
+  # Partial tests are worse than none: a failed tester pushes nothing.
+  [ "$ROLE" = dev ] || exit "$status"
+  # A dev run cut short (turn limit, timeout) keeps its work, so the next attempt continues from it.
+  # Never its edits to the frozen tests: the next attempt would inherit a rejected change.
+  git add -A -- . ':(exclude)tests/acceptance' >&2
+  if ! git diff --cached --quiet; then
+    git commit -q -m "wip: partial work, agent stopped (exit $status)" >&2
+  fi
+fi
 
 if [ "$(git rev-parse HEAD)" = "$start" ]; then
   echo "agent produced no commit" >&2
+  [ "$status" -ne 0 ] && exit "$status"
   exit 3
 fi
 write_key
@@ -58,3 +73,4 @@ if [ "$ROLE" = tester ]; then
 else
   git push origin "$branch" >&2 # never forced; the orchestrator's frozen-tests check catches rewrites anyway
 fi
+exit "$status" # a dev run cut short still fails: the orchestrator retries it

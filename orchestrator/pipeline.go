@@ -68,7 +68,7 @@ func (o *project) attempt(is issue, branch string, baseTree, testerTree map[stri
 		return "", err
 	} else if !ok {
 		// Its own explanation (a contradiction in the tests, a missing tool...) beats a generic retry message.
-		msg := "Your previous run failed or produced no new commit. Make the acceptance tests pass and commit your work."
+		msg := "Your previous run stopped before finishing (it failed, or produced no new commit). Whatever it had done is committed on the branch: continue from it, make the acceptance tests pass and commit your work."
 		if final = strings.TrimSpace(final); final != "" {
 			msg += "\n\nYour previous run ended with:\n\n" + clip(final, 3000)
 		}
