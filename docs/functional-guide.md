@@ -88,7 +88,7 @@ The comments to recognise on an issue:
 | 🔄 | `main` moved; the orchestrator merged it into the branch and reruns CI |
 | ✅ / 🚀 | Merged, and deployed to staging |
 | ⛔ Blocked | Stopped; the reason and how to resume follow |
-| ♻️ | The orchestrator restarted; the story starts over |
+| ♻️ | The story went back to the queue (restart or retry), or resumes its branch |
 
 ## Safeguards and unblocking
 
@@ -103,13 +103,13 @@ The forge stops itself rather than loop or spend without limit; `us-blocked` is 
 | Budget | Agent cost per spec, retries included, capped by `MAX_COST_PER_SPEC` (default $20) | Spec and its waiting stories → `us-blocked` |
 | Agent limits | 30 turns and 45 minutes per agent run | That run fails |
 | Staging | `GET /health` must answer 200 within one minute after a merge | Merge reverted, previous version redeployed, story → `us-blocked` |
-| Restart | Stories in progress or in review go back to `us-todo` | Story starts over |
+| Restart | Stories in progress or in review go back to `us-todo` | Story resumes its branch, or starts over if the dev had not started |
 
 To resume, read the last ⛔ comment, fix the cause, then set the label back:
 
 | Blocked | Fix first | Then set |
 | --- | --- | --- |
-| Story | Sharpen its acceptance criteria, or fix the infrastructure | `us-todo` (starts over from the tester) |
+| Story | Sharpen its acceptance criteria, or fix the infrastructure | `us-todo` (resumes its branch; delete `agent/us-<n>` to start over from the tester) |
 | Spec, planning failed | Make the spec clearer or smaller (20 stories at most) | `spec` |
 | Spec, over budget | Raise `MAX_COST_PER_SPEC` and restart the orchestrator | `spec-active`, then `us-todo` on its blocked stories |
 
@@ -124,5 +124,5 @@ Mustafar assumes one user and a Gitea reachable on localhost only; outside that,
 - **Shared deploy key.** One key serves every project. An agent could push to any branch except `main` of another project; the orchestrator only merges the commit it checked. The key is removed before Claude starts, and `planner` and `reviewer` never get it back.
 - **Docker socket.** The orchestrator holds it to build and run staging, which is root on the host.
 - **Budget blind spot.** A run killed by the 45-minute timeout reports no cost, so it is not counted against the spec budget. Its summary says so.
-- **Restarts lose progress.** Attempts and feedback live in memory; a story in flight starts over after a restart.
+- **Restarts lose attempt counts.** Attempts and feedback live in memory: a story in flight goes back to the queue after a restart, then resumes its branch with 3 fresh attempts.
 - **Staging only.** The forge deploys to a local staging container, never to production.

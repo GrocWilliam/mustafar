@@ -40,6 +40,7 @@ The orchestrator is one Go binary, standard library only, that polls Gitea every
 | `planner.go` | Runs the planner, creates stories, readiness by dependency, budget stop, spec closing |
 | `plan.go` | Pure parsing: the plan JSON, `Depends on` / `Part of` lines, plan and cost markers |
 | `pipeline.go` | One story from tester to merge: `deliver` and the dev `attempt` loop, `waitCI` |
+| `resume.go` | A retried story continues its branch when the dev had started, skipping the tester |
 | `checks.go` | Pure merge checks: reviewer verdict, frozen tests, protected paths |
 | `land.go` | Serialized merge: update the branch from `main`, rerun CI, squash-merge, deploy |
 | `deploy.go` | Build and run the staging container, health check, revert |
@@ -172,7 +173,7 @@ The orchestrator keeps no database: everything it must remember across restarts 
 
 1. Startup force-removes every container labelled `forge.agent`, so no agent of the previous run keeps pushing.
 2. On each project's first poll, `recover` moves `us-in-progress` and `us-review` stories back to `us-todo` with a ♻️ comment.
-3. The running set starts empty. Attempt counts and feedback were in memory, so those stories start over from the tester.
+3. The running set starts empty. Attempt counts and feedback were in memory, but the branch survives: a story whose branch has dev work after the tester's commits resumes it (`resume.go`), skipping the tester and keeping its tests frozen. A story without dev work starts over from the tester.
 
 There is deliberately no timeout-based requeue: a slow agent must not be duplicated while it is still running.
 

@@ -16,20 +16,23 @@ const (
 
 // deliver takes a US from acceptance tests to merge: tester, then up to maxAttempts dev cycles.
 // Agents write code; only the checks here decide. label tracks the US's current label for block().
-// Attempts and feedback live in memory: a restart re-queues the US from scratch.
+// Attempts and feedback live in memory: a restart re-queues the US, which resumes its branch if the dev had started.
 func (o *project) deliver(is issue, label *string) error {
 	branch := fmt.Sprintf("agent/us-%d", is.Number)
-	baseTree, err := o.treeOf(o.base)
+	baseTree, testerTree, resumed, err := o.resume(is, branch)
 	if err != nil {
 		return err
 	}
-
-	if ok, _, err := o.runAgent("tester", is, ""); err != nil || !ok {
-		return agentFailure("tester", err)
-	}
-	testerTree, err := o.treeOf(branch)
-	if err != nil {
-		return err
+	if !resumed {
+		if baseTree, err = o.treeOf(o.base); err != nil {
+			return err
+		}
+		if ok, _, err := o.runAgent("tester", is, ""); err != nil || !ok {
+			return agentFailure("tester", err)
+		}
+		if testerTree, err = o.treeOf(branch); err != nil {
+			return err
+		}
 	}
 	ownDir := fmt.Sprintf("%sus-%d/", acceptanceDir, is.Number)
 	if stray := outside(changed(baseTree, testerTree, ""), acceptanceDir); len(stray) > 0 {
@@ -39,7 +42,7 @@ func (o *project) deliver(is issue, label *string) error {
 		return fmt.Errorf("the tester wrote no acceptance tests in `%s`", ownDir)
 	}
 	// A story may change behavior that earlier stories' tests pin down: the tester updates those tests, visibly.
-	if earlier := outside(changed(baseTree, testerTree, acceptanceDir), ownDir); len(earlier) > 0 {
+	if earlier := outside(changed(baseTree, testerTree, acceptanceDir), ownDir); len(earlier) > 0 && !resumed {
 		msg := "🧪 This story supersedes earlier acceptance tests, which the tester updated: " + list(earlier) + ". The reviewer checks that the story requires it."
 		if _, err := o.gitea.comment(is.Number, msg); err != nil {
 			return err

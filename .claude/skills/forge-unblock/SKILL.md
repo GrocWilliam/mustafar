@@ -29,13 +29,13 @@ Read the issue and all its comments (`api GET "/repos/$repo/issues/$n"` and `...
 ## 2. Fix
 
 - Edit a story or spec body: `api PATCH "/repos/$repo/issues/$n" '{"body": ...}'` (JSON built with `python3` so quotes and newlines survive). Keep the `---`, `Part of #` and `Depends on #` lines at the end of a story.
-- Budget: change `MAX_COST_PER_SPEC` in `.env`, then `docker compose up -d orchestrator` (recreates it with the new value; running stories restart from scratch).
+- Budget: change `MAX_COST_PER_SPEC` in `.env`, then `docker compose up -d orchestrator` (recreates it with the new value; running stories go back to the queue).
 
 ## 3. Retry
 
 Get the label ids from `api GET "/repos/$repo/labels"`. Remove `us-blocked` (`api DELETE "/repos/$repo/issues/$n/labels/$BLOCKED_ID"`), then add the label to resume from (`api POST "/repos/$repo/issues/$n/labels" "{\"labels\": [$ID]}"`):
 
-- a story → `us-todo`: it starts over from the tester on a fresh branch from `main`;
+- a story → `us-todo`: it resumes its branch `agent/us-<n>` when the dev had already worked on it (the tester is skipped and its tests stay frozen), otherwise it starts over from the tester. Delete the branch to force a fresh start (`api DELETE "/repos/$repo/branches/agent%2Fus-$n"`), e.g. when the tests themselves were wrong;
 - a spec whose planning failed → `spec`: planned again (a failed plan's stories were closed);
 - a spec over budget → `spec-active`, then `us-todo` on each of its blocked stories.
 

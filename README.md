@@ -87,7 +87,7 @@ Once a project has a `Dockerfile` (the planner adds one when a spec describes a 
 
 | Blocked | Retry by setting |
 |---|---|
-| Story (`us-blocked`) | `us-todo` (starts over from the tester) |
+| Story (`us-blocked`) | `us-todo` (resumes its branch if the dev had started; delete `agent/us-<n>` to start over from the tester) |
 | Spec, planning failed | `spec` |
 | Spec, over budget | `spec-active`, after raising `MAX_COST_PER_SPEC` |
 

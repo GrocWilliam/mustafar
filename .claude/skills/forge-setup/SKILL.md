@@ -24,7 +24,7 @@ Then offer the `forge-spec` skill to create a first project.
 
 ## After a reboot or a crash
 
-`docker compose up -d gitea runner orchestrator`, then step 8. Stories that were in progress restart from scratch (`♻️` comment): that is expected.
+`docker compose up -d gitea runner orchestrator`, then step 8. Stories that were in progress go back to the queue (`♻️` comment) and resume their branch: that is expected.
 
 ## After changing the forge's code
 
