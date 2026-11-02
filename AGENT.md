@@ -133,6 +133,7 @@ Decisions so far:
 │   ├── checks.go             # tree diffs and reviewer verdict (+ checks_test.go)
 │   ├── planner.go            # spec planning, dependency-aware dispatch, budget, spec closure
 │   ├── plan.go               # plan JSON, issue references, markers (+ plan_test.go)
+│   ├── api.go                # JSON-over-HTTP client shared by Gitea and Docker, errors with a status code
 │   ├── gitea.go              # issues, labels, comment edited in place
 │   ├── gitea_pulls.go        # PRs, commit status, branch update, merge, close
 │   ├── gitea_git.go          # default branch, branch head, recursive tree, archive

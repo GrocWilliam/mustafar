@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 )
@@ -159,7 +160,7 @@ func (o *project) waitCI(sha string) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		if state == "success" || state == "failure" || state == "error" || state == "warning" {
+		if slices.Contains([]string{"success", "failure", "error", "warning"}, state) {
 			return state, nil
 		}
 	}

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"encoding/binary"
 	"encoding/json"
@@ -14,57 +13,14 @@ import (
 )
 
 // dockerEngine talks to the Docker Engine API over its Unix socket: the few calls needed don't justify the SDK.
-type dockerEngine struct {
-	http *http.Client
-}
+type dockerEngine struct{ api }
 
 func newDocker(socket string) *dockerEngine {
-	return &dockerEngine{http: &http.Client{Transport: &http.Transport{
+	return &dockerEngine{api{name: "docker", base: "http://docker", http: &http.Client{Transport: &http.Transport{
 		DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
 			return (&net.Dialer{}).DialContext(ctx, "unix", socket)
 		},
-	}}}
-}
-
-func (d *dockerEngine) do(method, path string, in any) (*http.Response, error) {
-	var body io.Reader
-	contentType := "application/json"
-	if context, ok := in.(io.Reader); ok {
-		body, contentType = context, "application/x-tar" // a build context
-	} else if in != nil {
-		data, err := json.Marshal(in)
-		if err != nil {
-			return nil, err
-		}
-		body = bytes.NewReader(data)
-	}
-	req, err := http.NewRequest(method, "http://docker"+path, body)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Content-Type", contentType)
-	resp, err := d.http.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	if resp.StatusCode >= 300 {
-		defer resp.Body.Close()
-		msg, _ := io.ReadAll(io.LimitReader(resp.Body, 500))
-		return nil, fmt.Errorf("docker %s %s: %s %s", method, path, resp.Status, msg)
-	}
-	return resp, nil
-}
-
-func (d *dockerEngine) call(method, path string, in, out any) error {
-	resp, err := d.do(method, path, in)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	if out == nil {
-		return nil
-	}
-	return json.NewDecoder(resp.Body).Decode(out)
+	}}}}
 }
 
 // run creates and starts a container; the id is returned even when start fails, so the caller can remove it.
@@ -125,7 +81,7 @@ func (d *dockerEngine) build(context io.Reader, tag string) error {
 
 // serve replaces the container called name by one running image, its port published on localhost:hostPort.
 func (d *dockerEngine) serve(name, image, network, port, hostPort string) error {
-	if err := d.remove(name); err != nil && !strings.Contains(err.Error(), "404") {
+	if err := d.remove(name); err != nil && !hasStatus(err, http.StatusNotFound) {
 		return err
 	}
 	spec := map[string]any{
@@ -155,6 +111,17 @@ func (d *dockerEngine) logs(id, query string) (io.ReadCloser, error) {
 		resp.Body.Close()
 	}()
 	return reader, nil
+}
+
+// stderrTail returns the last lines the container wrote to stderr, or "" when they cannot be read.
+func (d *dockerEngine) stderrTail(id string, lines int) string {
+	logs, err := d.logs(id, fmt.Sprintf("stderr=1&tail=%d", lines))
+	if err != nil {
+		return ""
+	}
+	defer logs.Close()
+	out, _ := io.ReadAll(logs)
+	return strings.TrimSpace(string(out))
 }
 
 func (d *dockerEngine) wait(id string) (int, error) {

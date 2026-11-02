@@ -149,12 +149,7 @@ func (o *project) revert(sha, title string) error {
 		return err
 	}
 	if code != 0 {
-		var stderr []byte
-		if logs, err := o.docker.logs(id, "stderr=1&tail=10"); err == nil {
-			stderr, _ = io.ReadAll(logs)
-			logs.Close()
-		}
-		return fmt.Errorf("git revert exited with %d: %s", code, strings.TrimSpace(string(stderr)))
+		return fmt.Errorf("git revert exited with %d: %s", code, o.docker.stderrTail(id, 10))
 	}
 	pr, err := o.gitea.openPR(title, "Reverts "+sha+": its staging deployment failed.", branch, o.base)
 	if err != nil {

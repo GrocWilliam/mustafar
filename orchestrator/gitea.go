@@ -1,10 +1,7 @@
 package main
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"sort"
@@ -41,57 +38,20 @@ func (is issue) hasLabel(name string) bool {
 
 // gitea is a minimal Gitea API client, scoped to one repository (path `/repos/owner/repo`) or to the API root (path "").
 type gitea struct {
-	base, token string
-	http        *http.Client
-	labelIDs    map[string]int64
+	api
+	labelIDs map[string]int64
 }
 
 func newGitea(c config, path string) *gitea {
 	return &gitea{
-		base:     c.GiteaURL + "/api/v1" + path,
-		token:    c.GiteaToken,
-		http:     &http.Client{Timeout: 30 * time.Second},
+		api: api{
+			name:   "gitea",
+			base:   c.GiteaURL + "/api/v1" + path,
+			http:   &http.Client{Timeout: 30 * time.Second},
+			header: http.Header{"Authorization": {"token " + c.GiteaToken}},
+		},
 		labelIDs: map[string]int64{},
 	}
-}
-
-func (g *gitea) do(method, path string, in any) (*http.Response, error) {
-	var body io.Reader
-	if in != nil {
-		data, err := json.Marshal(in)
-		if err != nil {
-			return nil, err
-		}
-		body = bytes.NewReader(data)
-	}
-	req, err := http.NewRequest(method, g.base+path, body)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Authorization", "token "+g.token)
-	req.Header.Set("Content-Type", "application/json")
-	resp, err := g.http.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	if resp.StatusCode >= 300 {
-		defer resp.Body.Close()
-		msg, _ := io.ReadAll(io.LimitReader(resp.Body, 500))
-		return nil, fmt.Errorf("gitea %s %s: %s %s", method, path, resp.Status, msg)
-	}
-	return resp, nil
-}
-
-func (g *gitea) call(method, path string, in, out any) error {
-	resp, err := g.do(method, path, in)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	if out == nil {
-		return nil
-	}
-	return json.NewDecoder(resp.Body).Decode(out)
 }
 
 // ensureLabels creates the lifecycle labels if missing and caches their ids.
