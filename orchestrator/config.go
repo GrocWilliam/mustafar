@@ -38,9 +38,10 @@ func loadConfig() (config, error) {
 	if c.GiteaToken == "" {
 		return c, errors.New("GITEA_TOKEN is required")
 	}
+	// Below 1 s, the poll loop and waitCI would hammer Gitea in a busy loop.
 	seconds, err := strconv.Atoi(env("POLL_SECONDS", "30"))
-	if err != nil {
-		return c, fmt.Errorf("POLL_SECONDS: %w", err)
+	if err != nil || seconds < 1 {
+		return c, fmt.Errorf("POLL_SECONDS must be a positive integer")
 	}
 	c.PollEvery = time.Duration(seconds) * time.Second
 	if c.MaxAgents, err = strconv.Atoi(env("MAX_AGENTS", "1")); err != nil || c.MaxAgents < 1 {
