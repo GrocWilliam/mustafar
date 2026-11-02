@@ -60,6 +60,9 @@ func (o *project) poll() error {
 		return err
 	}
 	for _, spec := range specs {
+		if !o.dependenciesClosed(spec) { // a spec ending with `Depends on #n` waits for #n to close
+			continue
+		}
 		if !o.start(spec.Number, func() error { return o.planSpec(spec) }) {
 			return nil
 		}

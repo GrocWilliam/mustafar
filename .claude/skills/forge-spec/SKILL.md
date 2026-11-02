@@ -29,6 +29,7 @@ Ask the user only about real gaps (stack, a business rule); state the other choi
 ## 2. Open it
 
 - **New project** (repo name: lowercase, `[a-z0-9-]`): `./new-project.sh NAME /path/to/spec.md`. It creates the repo, deploy key, CI workflow and `forge` topic, waits for the orchestrator to create the labels, and opens the spec. Check first that the orchestrator runs (`curl -s localhost:8000/health`).
+- **After another spec**: end the body with a line `Depends on #N`; the orchestrator plans it only once #N is closed.
 - **Existing project** `owner/repo`: get the `spec` label id from `api GET "/repos/$repo/labels"`, then
   `api POST "/repos/$repo/issues" "{\"title\": ..., \"body\": ..., \"labels\": [ID]}"`, building the JSON with `python3 -c 'import json,sys; ...'` so quotes and newlines survive.
 
