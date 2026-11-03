@@ -31,8 +31,14 @@ func (g *gitea) findPR(branch string) (*pullRequest, error) {
 	return nil, nil
 }
 
+// prSettle is how long openPR waits after a push: Gitea 1.22 handles pushes in a queue, and if the pull request
+// already exists when it gets to a new branch's first push, it fires a `synchronize` run on top of the `opened` one.
+// shortcut: a fixed wait, not a signal that Gitea handled the push; drop it with Gitea 1.26 `concurrency` in ci.yml.
+var prSettle = 10 * time.Second
+
 // openPR opens a pull request from branch to base.
 func (g *gitea) openPR(title, body, branch, base string) (*pullRequest, error) {
+	time.Sleep(prSettle)
 	var pr pullRequest
 	err := g.call("POST", "/pulls", map[string]string{
 		"head":  branch,

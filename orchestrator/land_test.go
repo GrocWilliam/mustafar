@@ -72,6 +72,7 @@ func newFakeForge(t *testing.T, f *fakes) *project {
 // A merge whose deployment fails is reverted through a pull request (merged once Gitea stops answering 405),
 // the previous main is redeployed, and the US is reopened.
 func TestLandRollsBackFailedDeploy(t *testing.T) {
+	prSettle = 0
 	mergeRetry = 0
 	previous, merged := strings.Repeat("a", 40), strings.Repeat("b", 40)
 	mainHeads := []string{previous, merged}
