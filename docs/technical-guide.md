@@ -144,7 +144,7 @@ After each dev attempt the orchestrator runs fixed checks in order; the first on
 
 ### The CI workflow
 
-Each project carries `.gitea/workflows/ci.yml`, copied from `templates/ci.yml` and protected by `PROTECTED_PATHS`. It runs on `pull_request` in two jobs: `make test`, then every `tests/acceptance/*/run.sh` from a fresh checkout, so the dev's `Makefile` can neither skip nor rewrite them. Jobs run in the local `forge-ci` image, which ships Chromium for browser tests, on the `forge` network, without the Docker socket.
+Each project carries `.gitea/workflows/ci.yml`, copied from `templates/ci.yml` and protected by `PROTECTED_PATHS`. It runs on `pull_request`: `make test`, then the `tests/acceptance/*/run.sh` scripts from a fresh checkout, so the dev's `Makefile` can neither skip nor rewrite them, split round-robin across 3 parallel shard jobs. Each shard runs `make build` once when that target exists and sets `FORGE_PREBUILT=1`, so scripts skip their own build. Jobs run in the local `forge-ci` image, which ships Chromium and `playwright-core` (`$PLAYWRIGHT_DIR`) for browser tests, on the `forge` network, without the Docker socket. Their outgoing connections use ports 40000 and up (`runner/config.yaml`), so a test server below that never collides with its own `/health` checks.
 
 ### Merge (`land.go`)
 
@@ -202,7 +202,7 @@ There is deliberately no timeout-based requeue: a slow agent must not be duplica
 | `GITEA_TOKEN` | required | Orchestrator API token (`write:repository,write:issue`). Never given to agents. |
 | `GITEA_RUNNER_REGISTRATION_TOKEN` | none | Registers `act_runner` |
 | `POLL_SECONDS` | 30 | Poll and CI-wait interval. Must be at least 1. |
-| `MAX_AGENTS` | 1 in code, 2 in `.env.example` | Specs and stories worked on at once, all projects. Keep `runner/config.yaml` capacity at least twice as high: each commit runs 2 CI jobs. |
+| `MAX_AGENTS` | 1 in code, 2 in `.env.example` | Specs and stories worked on at once, all projects. Keep `runner/config.yaml` capacity at least 4 times as high: each commit runs 4 CI jobs. |
 | `MAX_COST_PER_SPEC` | 20 | USD per spec, as reported by Claude Code |
 | `PROTECTED_PATHS` | `.gitea/` | Comma-separated path prefixes a pull request must not touch |
 | `GITEA_URL`, `GITEA_SSH_URL` | `http://gitea:3000`, `ssh://git@gitea:22/` | Inside the compose network |
@@ -264,7 +264,7 @@ Unit tests cover the pure parts: stream parsing and summaries (`agent_runner_tes
 | `protecting main: ... 403` in the logs | Token cannot create branch protection | Regenerate `GITEA_TOKEN` with more rights |
 | Story blocked: `no CI result after 30m` | Runner down or not registered | `docker compose up -d runner`; it can lose a race with Gitea at boot |
 | Stories wait while slots are free | Dependencies still open, or spec over budget | Check `Depends on` issues and the spec's ⛔ comment |
-| Parallel stories queue in CI | Runner `capacity` below 2 × `MAX_AGENTS` | Raise `capacity` in `runner/config.yaml` |
+| Parallel stories queue in CI | Runner `capacity` below 4 × `MAX_AGENTS` | Raise `capacity` in `runner/config.yaml` |
 | Disk filling up | Deployed images are never pruned | Remove old `forge-app/*` images |
 
 The `forge-status` and `forge-unblock` skills automate the reading and the retry.

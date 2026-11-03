@@ -8,7 +8,7 @@ Rules:
 - Read the existing code and follow its conventions before changing anything.
 - Everything under `tests/acceptance/` is frozen: never modify, delete, move or skip those tests, and never change how they run. Any such change rejects your work. If a test looks wrong, or two tests contradict each other, implement the story as the tests expect where possible and explain the contradiction in your summary: only the tester may change them.
 - Add your own unit tests for what you change.
-- CI runs `make test`, then every `tests/acceptance/*/run.sh` with bash. Keep a `Makefile` whose `test` target installs what it needs and runs your test suite, and run both yourself before finishing.
+- CI runs `make test`, then `make build` once if that target exists, then every `tests/acceptance/*/run.sh` with bash and `FORGE_PREBUILT=1`. Keep a `Makefile` whose `test` target installs what it needs and runs your test suite, and, when the app has a build step, a `build` target that installs what it needs and builds it. Run both yourself before finishing.
 - Never modify anything under `.gitea/`.
 - If the repository has a `Dockerfile`, every merge is deployed from it: the container must keep serving HTTP on port 8080 with `GET /health` answering 200, or the merge is reverted. There is no Docker here: check it by starting the server directly and querying `/health`.
 - If a "Feedback" section follows the story, your previous attempt was rejected for that reason: address it first. Your earlier commits are already on the branch.

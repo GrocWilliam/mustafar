@@ -6,3 +6,6 @@ FROM node:26-bookworm
 RUN apt-get update && apt-get install -y --no-install-recommends chromium fonts-dejavu-core \
  && rm -rf /var/lib/apt/lists/*
 ENV CHROMIUM_PATH=/usr/bin/chromium
+# playwright-core preinstalled, so acceptance tests load it from here instead of installing it on every run. Read-only use.
+RUN mkdir /opt/playwright && cd /opt/playwright && npm init -y >/dev/null && npm i playwright-core@1.64.1 && chmod -R a-w /opt/playwright
+ENV PLAYWRIGHT_DIR=/opt/playwright

@@ -1,6 +1,6 @@
 # act_runner settings; unset keys keep act_runner's defaults.
 runner:
-  capacity: 4 # each commit runs 2 jobs (test, acceptance): keep >= 2 × MAX_AGENTS, or parallel stories queue for CI
+  capacity: 8 # each commit runs 4 jobs (test, 3 acceptance shards): keep >= 4 × MAX_AGENTS, or parallel stories queue for CI
   labels:
     - "ubuntu-latest:docker://forge-ci" # built locally (ci/Dockerfile): the same toolchain as the agents
 container:
@@ -9,3 +9,6 @@ container:
   network: forge
   # "-" = never mount the Docker socket into jobs: CI runs agent-written code, which must not get root on the host.
   docker_host: "-"
+  # Outgoing connections take ports from 40000 up, so a test server on a lower port never clashes with its own
+  # /health checks (EADDRINUSE).
+  options: --sysctl net.ipv4.ip_local_port_range="40000 60999"

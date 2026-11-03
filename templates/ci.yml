@@ -13,12 +13,19 @@ jobs:
   acceptance:
     needs: test
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        shard: [0, 1, 2] # scripts split round-robin across 3 parallel jobs; also in the loop below
     steps:
       - uses: actions/checkout@v4
       - name: acceptance tests (frozen, written by the tester agent)
         run: |
+          # Build once for every script of this shard; scripts skip their own build when FORGE_PREBUILT is set.
+          if make -n build >/dev/null 2>&1; then make build; export FORGE_PREBUILT=1; fi
+          i=0
           for script in tests/acceptance/*/run.sh; do
             [ -e "$script" ] || continue
+            [ $((i++ % 3)) -eq ${{ matrix.shard }} ] || continue
             echo "== $script"
             bash "$script"
           done

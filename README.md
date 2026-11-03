@@ -101,7 +101,7 @@ Once a project has a `Dockerfile` (the planner adds one when a spec describes a 
 | `GITEA_TOKEN` | — | Orchestrator API token, never given to agents. |
 | `GITEA_RUNNER_REGISTRATION_TOKEN` | — | act_runner registration. |
 | `POLL_SECONDS` | `30` | How often the orchestrator polls Gitea. |
-| `MAX_AGENTS` | `2` in `.env.example` | Specs and stories worked on at once, across all projects. Keep `runner/config.yaml` capacity at least twice as high: each commit runs 2 CI jobs. |
+| `MAX_AGENTS` | `2` in `.env.example` | Specs and stories worked on at once, across all projects. Keep `runner/config.yaml` capacity at least 4 times as high: each commit runs 4 CI jobs. |
 | `MAX_COST_PER_SPEC` | `20` | USD; a spec's remaining stories are blocked once its agents cost more. |
 | `PROTECTED_PATHS` | `.gitea/` | Comma-separated path prefixes a PR must not touch; such a PR is blocked, never merged. |
 
