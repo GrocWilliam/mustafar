@@ -54,7 +54,7 @@ func (o *project) deploy(sha string) (bool, error) {
 	if err := o.docker.build(context, image); err != nil {
 		return true, err
 	}
-	if err := o.docker.serve(o.staging(), image, o.cfg.AgentNetwork, appPort, o.stagingPort()); err != nil {
+	if err := o.docker.serve(o.staging(), image, o.cfg.AgentNetwork, appPort, o.cfg.PublishIP, o.stagingPort()); err != nil {
 		return true, err
 	}
 	return true, waitHealthy("http://"+o.staging()+":"+appPort+"/health", healthTimeout)

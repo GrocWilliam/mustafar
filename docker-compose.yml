@@ -9,6 +9,7 @@ services:
       - GITEA__server__ROOT_URL=http://gitea:3000/
       - GITEA__server__SSH_DOMAIN=gitea
       - GITEA__server__SSH_PORT=2222
+      - GITEA__server__PUBLIC_URL_DETECTION=auto # links follow the Host the browser used, e.g. the LAN IP from a phone
       - GITEA__actions__ENABLED=true
       - GITEA__security__INSTALL_LOCK=true # no web wizard: the admin is created from the CLI (README)
     ports:
@@ -23,7 +24,8 @@ services:
     env_file: .env
     depends_on: [gitea]
     ports:
-      - "127.0.0.1:8000:8000" # localhost only: the forge UI's buttons start paid agent runs
+      # localhost by default: the forge UI's buttons start paid agent runs. PUBLISH_IP=0.0.0.0 opens it (and the staging apps) to the LAN.
+      - "${PUBLISH_IP:-127.0.0.1}:8000:8000"
     volumes:
       # The Docker socket is root on the host, :ro or not (see AGENT.md, Security).
       - /var/run/docker.sock:/var/run/docker.sock

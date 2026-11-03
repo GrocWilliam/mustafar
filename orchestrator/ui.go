@@ -319,7 +319,7 @@ func (o *project) uiProject(activity map[string]agentActivity) (uiProject, error
 
 // serveUI registers the page, its state endpoint, and the actions. The actions start paid agent runs: they only
 // accept requests carrying the X-Forge-UI header, which a page on another origin cannot send without a CORS
-// preflight this server never answers, and docker-compose publishes :8000 on localhost only.
+// preflight this server never answers, and docker-compose publishes :8000 on PUBLISH_IP (localhost by default).
 func (f *forge) serveUI() {
 	http.HandleFunc("GET /{$}", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")

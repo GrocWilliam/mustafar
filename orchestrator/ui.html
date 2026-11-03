@@ -150,6 +150,13 @@ function stepsBar(st) {
     }).join("") + "</div>";
 }
 
+// here points a link at the host this page was opened on: `gitea` and `localhost` only resolve on the forge machine.
+function here(u) {
+  const url = new URL(u);
+  url.hostname = location.hostname;
+  return url.href;
+}
+
 function storyItem(p, st) {
   const deps = st.deps.length ? ` · after ${st.deps.map((d) => "#" + d).join(", ")}` : "";
   const attempt = st.attempt > 1 && st.step > 0 && st.step < 6 ? ` · attempt ${st.attempt}/3` : "";
@@ -157,7 +164,7 @@ function storyItem(p, st) {
       <button data-act="retry" data-project="${esc(p.name)}" data-number="${st.number}">Retry</button>
       <button class="danger" data-act="retry-fresh" data-project="${esc(p.name)}" data-number="${st.number}">Retry from scratch</button></div>` : "";
   return `<li class="story"><div class="story-line">
-      <span class="story-title"><span class="num">#${st.number}</span> <a href="${esc(st.url)}" target="_blank" rel="noopener">${esc(st.title)}</a>
+      <span class="story-title"><span class="num">#${st.number}</span> <a href="${esc(here(st.url))}" target="_blank" rel="noopener">${esc(st.title)}</a>
       <span class="meta">${money(st.cost)}${attempt}${deps}</span></span>${stepsBar(st)}</div>${agentBox(st.agent)}${blocked}</li>`;
 }
 
@@ -170,7 +177,7 @@ function specCard(p, s) {
   const stories = total ? `<ul class="stories">${s.stories.map((st) => storyItem(p, st)).join("")}</ul>`
     : `<p class="empty">${s.phase === "planning" ? "Waiting for the planner…" : "No stories."}</p>`;
   return `<section class="card" aria-label="Spec #${s.number}">
-    <div class="spec-head"><h3><a href="${esc(s.url)}" target="_blank" rel="noopener">#${s.number} ${esc(s.title)}</a></h3>
+    <div class="spec-head"><h3><a href="${esc(here(s.url))}" target="_blank" rel="noopener">#${s.number} ${esc(s.title)}</a></h3>
       <span class="phase ${s.phase}">${s.phase}</span></div>
     <div class="meters">
       <div class="meter">Stories: ${s.done} / ${total} done<div class="bar"><span style="width:${total ? (100 * s.done) / total : 0}%"></span></div></div>
@@ -190,7 +197,7 @@ function projectSection(p) {
   const done = p.specs.filter((s) => s.phase === "done").reverse();
   const doneKey = `done:${p.name}`, newKey = `new:${p.name}`;
   return `<section class="project"><h2>${esc(p.name)}
-      <small><a href="${esc(p.url)}" target="_blank" rel="noopener">Gitea</a> · <a href="${esc(p.staging)}" target="_blank" rel="noopener">staging</a></small></h2>
+      <small><a href="${esc(here(p.url))}" target="_blank" rel="noopener">Gitea</a> · <a href="${esc(here(p.staging))}" target="_blank" rel="noopener">staging</a></small></h2>
     ${p.error ? `<p class="error">Could not read this project: ${esc(p.error)}</p>` : ""}
     ${active.map((s) => specCard(p, s)).join("") || `<p class="empty">No spec in progress.</p>`}
     <details class="card" data-key="${esc(newKey)}"${open.has(newKey) ? " open" : ""}><summary>New spec</summary>

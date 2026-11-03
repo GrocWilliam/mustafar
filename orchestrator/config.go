@@ -14,6 +14,8 @@ type config struct {
 	// SSHBase prefixes `owner/repo.git` for agents to clone and push inside the compose network (Gitea's sshd listens on 22 there).
 	SSHBase                                 string
 	AgentImage, AgentNetwork, DeployKeyFile string
+	// PublishIP is the host address staging apps listen on: 127.0.0.1, or 0.0.0.0 for the LAN.
+	PublishIP string
 	// DeployKeyPubFile and CITemplate are what a project created from the UI gets: the agents' key, the CI workflow.
 	DeployKeyPubFile, CITemplate, MemoryTemplate string
 	// Defaults are the .env settings; SettingsFile holds the UI's changes, which win (settings.go).
@@ -32,6 +34,7 @@ func loadConfig() (config, error) {
 		SSHBase:          env("GITEA_SSH_URL", "ssh://git@gitea:22/"),
 		AgentImage:       env("AGENT_IMAGE", "forge-agent"),
 		AgentNetwork:     env("AGENT_NETWORK", "forge"),
+		PublishIP:        env("PUBLISH_IP", "127.0.0.1"),
 		DeployKeyFile:    env("DEPLOY_KEY_FILE", "/run/secrets/deploy_key"),
 		DeployKeyPubFile: env("DEPLOY_KEY_PUB_FILE", "/run/secrets/deploy_key.pub"),
 		CITemplate:       env("CI_TEMPLATE", "/templates/ci.yml"),

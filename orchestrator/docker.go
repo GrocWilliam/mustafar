@@ -79,8 +79,8 @@ func (d *dockerEngine) build(context io.Reader, tag string) error {
 	}
 }
 
-// serve replaces the container called name by one running image, its port published on localhost:hostPort.
-func (d *dockerEngine) serve(name, image, network, port, hostPort string) error {
+// serve replaces the container called name by one running image, its port published on hostIP:hostPort.
+func (d *dockerEngine) serve(name, image, network, port, hostIP, hostPort string) error {
 	if err := d.remove(name); err != nil && !hasStatus(err, http.StatusNotFound) {
 		return err
 	}
@@ -90,7 +90,7 @@ func (d *dockerEngine) serve(name, image, network, port, hostPort string) error 
 		"HostConfig": map[string]any{
 			"NetworkMode":   network,
 			"RestartPolicy": map[string]string{"Name": "unless-stopped"},
-			"PortBindings":  map[string]any{port + "/tcp": []map[string]string{{"HostIp": "127.0.0.1", "HostPort": hostPort}}},
+			"PortBindings":  map[string]any{port + "/tcp": []map[string]string{{"HostIp": hostIP, "HostPort": hostPort}}},
 		},
 	}
 	if err := d.call("POST", "/containers/create?name="+name, spec, nil); err != nil {

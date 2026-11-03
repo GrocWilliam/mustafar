@@ -103,6 +103,7 @@ Once a project has a `Dockerfile` (the planner adds one when a spec describes a 
 | `POLL_SECONDS` | `30` | How often the orchestrator polls Gitea. |
 | `MAX_AGENTS` | `2` in `.env.example` | Specs and stories worked on at once, across all projects. Keep `runner/config.yaml` capacity at least 4 times as high: each commit runs 4 CI jobs. |
 | `MAX_COST_PER_SPEC` | `20` | USD; a spec's remaining stories are blocked once its agents cost more. |
+| `PUBLISH_IP` | `127.0.0.1` | Where the forge UI (`:8000`) and staging apps (`9000 + repo id`) listen. `0.0.0.0` opens them to the LAN (a phone at home); the UI has no login, so trusted networks only. |
 
 `POLL_SECONDS`, `MAX_AGENTS` and `MAX_COST_PER_SPEC` are defaults: changes made in the forge UI (**⚙ Settings**) apply at once, are saved in the `orchestrator-data` volume and win over `.env`. Delete `/data/settings.json` there to go back to `.env`.
 | `PROTECTED_PATHS` | `.gitea/` | Comma-separated path prefixes a PR must not touch; such a PR is blocked, never merged. |
