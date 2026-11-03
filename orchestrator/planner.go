@@ -202,5 +202,5 @@ func (o *project) specCost(spec int) (cost, budget float64, err error) {
 		}
 		cost += sumCosts(storyComments)
 	}
-	return cost, specBudget(comments, o.cfg.MaxCostPerSpec), nil
+	return cost, specBudget(comments, o.settings().MaxCostPerSpec), nil
 }

@@ -17,7 +17,8 @@ const projectTopic = "forge"
 // forge holds what all projects share: the agent slots and the Docker engine.
 type forge struct {
 	cfg    config
-	root   *gitea // API root, to discover the projects
+	live   settings // under mu: read it with settings()
+	root   *gitea   // API root, to discover the projects
 	docker *dockerEngine
 	// projects, by full name, are added by the poll loop and read by the UI handlers under pmu.
 	pmu      sync.RWMutex
@@ -35,8 +36,13 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	live, err := loadSettings(cfg.SettingsFile, cfg.Defaults)
+	if err != nil {
+		log.Fatalf("settings: %v", err)
+	}
 	f := &forge{
 		cfg:      cfg,
+		live:     live,
 		root:     newGitea(cfg, ""),
 		docker:   newDocker("/var/run/docker.sock"),
 		projects: map[string]*project{},
@@ -70,7 +76,7 @@ func main() {
 func (f *forge) loop() {
 	for {
 		f.poll()
-		time.Sleep(f.cfg.PollEvery)
+		time.Sleep(f.settings().pollEvery())
 	}
 }
 
@@ -107,7 +113,7 @@ func (f *forge) start(key string, work func() error) bool {
 	if f.running[key] {
 		return true
 	}
-	if len(f.running) >= f.cfg.MaxAgents {
+	if len(f.running) >= f.live.MaxAgents {
 		return false
 	}
 	f.running[key] = true

@@ -28,6 +28,9 @@ services:
       # The Docker socket is root on the host, :ro or not (see AGENT.md, Security).
       - /var/run/docker.sock:/var/run/docker.sock
       - ./secrets/deploy_key:/run/secrets/deploy_key:ro
+      - ./secrets/deploy_key.pub:/run/secrets/deploy_key.pub:ro # given to the projects the UI creates
+      - ./templates:/templates:ro # their CI workflow
+      - orchestrator-data:/data # the settings changed from the UI
     security_opt:
       - label=disable # SELinux (Fedora) blocks socket access otherwise
     networks: [forge]
@@ -69,5 +72,6 @@ networks:
     name: forge # fixed name so the orchestrator can attach agent containers to it
 
 volumes:
+  orchestrator-data:
   gitea-data:
   runner-data:

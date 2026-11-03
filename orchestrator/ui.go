@@ -170,18 +170,21 @@ type uiSpec struct {
 }
 
 type uiProject struct {
-	Name    string   `json:"name"`
-	URL     string   `json:"url"`
-	Staging string   `json:"staging"`
-	Specs   []uiSpec `json:"specs"`
-	Error   string   `json:"error,omitempty"`
+	Name        string       `json:"name"`
+	URL         string       `json:"url"`
+	Staging     string       `json:"staging"`
+	Specs       []uiSpec     `json:"specs"`
+	Error       string       `json:"error,omitempty"`
+	Mirrors     []pushMirror `json:"mirrors"`
+	MirrorError string       `json:"mirrorError,omitempty"`
 }
 
 type uiState struct {
-	MaxAgents     int         `json:"maxAgents"`
-	Running       []string    `json:"running"`
-	DefaultBudget float64     `json:"defaultBudget"`
-	Projects      []uiProject `json:"projects"`
+	Settings  settings    `json:"settings"`
+	Defaults  settings    `json:"defaults"` // .env's, before the UI's changes
+	Running   []string    `json:"running"`
+	Projects  []uiProject `json:"projects"`
+	Adoptable []string    `json:"adoptable"` // Gitea repos that could become forge projects
 }
 
 func (f *forge) readyProjects() []*project {
@@ -208,7 +211,7 @@ func (f *forge) readyProject(name string) *project {
 
 func (f *forge) state() uiState {
 	f.mu.Lock()
-	s := uiState{MaxAgents: f.cfg.MaxAgents, DefaultBudget: f.cfg.MaxCostPerSpec, Running: []string{}, Projects: []uiProject{}}
+	s := uiState{Settings: f.live, Defaults: f.cfg.Defaults, Running: []string{}, Projects: []uiProject{}, Adoptable: []string{}}
 	for key := range f.running {
 		s.Running = append(s.Running, key)
 	}
@@ -223,7 +226,13 @@ func (f *forge) state() uiState {
 		if err != nil {
 			up.Error = err.Error()
 		}
+		if up.Mirrors, err = p.gitea.pushMirrors(); err != nil {
+			up.Mirrors, up.MirrorError = []pushMirror{}, err.Error()
+		}
 		s.Projects = append(s.Projects, up)
+	}
+	if names, err := f.adoptable(); err == nil {
+		s.Adoptable = names // best effort: only the import form's suggestions
 	}
 	return s
 }
@@ -264,7 +273,7 @@ func (o *project) uiProject(activity map[string]agentActivity) (uiProject, error
 			return up, err
 		}
 		spec := uiSpec{Number: is.Number, Title: is.Title, URL: up.URL + fmt.Sprintf("/issues/%d", is.Number), State: is.State,
-			Cost: sumCosts(specComments), Budget: specBudget(specComments, o.cfg.MaxCostPerSpec), Agent: agent(is.Number), Stories: []uiStory{}}
+			Cost: sumCosts(specComments), Budget: specBudget(specComments, o.settings().MaxCostPerSpec), Agent: agent(is.Number), Stories: []uiStory{}}
 		switch {
 		case is.State == "closed":
 			spec.Phase = "done"
@@ -322,6 +331,14 @@ func (f *forge) serveUI() {
 	http.HandleFunc("POST /api/retry", f.action(f.retry))
 	http.HandleFunc("POST /api/budget", f.action(f.setBudget))
 	http.HandleFunc("POST /api/spec", f.action(f.openSpec))
+	http.HandleFunc("POST /api/project", uiAction(f.addProject))
+	http.HandleFunc("POST /api/mirror", uiAction(f.mirror))
+	http.HandleFunc("POST /api/settings", uiAction(func(s settings) (string, error) {
+		if err := f.updateSettings(s); err != nil {
+			return "", err
+		}
+		return fmt.Sprintf("settings saved: %d agents, $%.2f per spec, poll every %ds", s.MaxAgents, s.MaxCostPerSpec, s.PollSeconds), nil
+	}))
 }
 
 type actionInput struct {
@@ -336,31 +353,47 @@ type actionInput struct {
 // errBadRequest marks an action refused because of its input or the issue's state, not a failure.
 var errBadRequest = errors.New("bad request")
 
+var errNotFound = errors.New("not found")
+
+// action is uiAction for the actions on one project's issue.
 func (f *forge) action(do func(*project, actionInput) (string, error)) http.HandlerFunc {
+	return uiAction(func(in actionInput) (string, error) {
+		p := f.readyProject(in.Project)
+		if p == nil {
+			return "", fmt.Errorf("unknown project %s: %w", in.Project, errNotFound)
+		}
+		msg, err := do(p, in)
+		if err == nil {
+			msg = p.name + ": " + msg
+		}
+		return msg, err
+	})
+}
+
+// uiAction decodes a UI request into T, runs do, and answers its message or error. Messages and errors are
+// logged: they never carry the tokens some inputs hold.
+func uiAction[T any](do func(T) (string, error)) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("X-Forge-UI") != "1" {
 			writeJSON(w, http.StatusForbidden, map[string]string{"error": "missing X-Forge-UI header"})
 			return
 		}
-		var in actionInput
+		var in T
 		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20)).Decode(&in); err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid JSON: " + err.Error()})
 			return
 		}
-		p := f.readyProject(in.Project)
-		if p == nil {
-			writeJSON(w, http.StatusNotFound, map[string]string{"error": "unknown project " + in.Project})
-			return
-		}
-		msg, err := do(p, in)
+		msg, err := do(in)
 		switch {
+		case errors.Is(err, errNotFound):
+			writeJSON(w, http.StatusNotFound, map[string]string{"error": strings.TrimSuffix(err.Error(), ": "+errNotFound.Error())})
 		case errors.Is(err, errBadRequest):
 			writeJSON(w, http.StatusConflict, map[string]string{"error": strings.TrimSuffix(err.Error(), ": "+errBadRequest.Error())})
 		case err != nil:
-			log.Printf("%s: UI action: %v", p.name, err)
+			log.Printf("UI action: %v", err)
 			writeJSON(w, http.StatusBadGateway, map[string]string{"error": err.Error()})
 		default:
-			log.Printf("%s: UI action: %s", p.name, msg)
+			log.Printf("UI action: %s", msg)
 			writeJSON(w, http.StatusOK, map[string]string{"message": msg})
 		}
 	}
@@ -457,7 +490,7 @@ func (f *forge) setBudget(p *project, in actionInput) (string, error) {
 	if len(refs(partOfLine, is.Body)) > 0 {
 		return "", refuse("#%d is a story: budgets are per spec", in.Number)
 	}
-	msg := fmt.Sprintf("💰 Budget set to $%.2f from the forge UI (default $%.2f). %s", in.Budget, f.cfg.MaxCostPerSpec, budgetMarkerFor(in.Budget))
+	msg := fmt.Sprintf("💰 Budget set to $%.2f from the forge UI (default $%.2f). %s", in.Budget, f.settings().MaxCostPerSpec, budgetMarkerFor(in.Budget))
 	if _, err := p.gitea.comment(in.Number, msg); err != nil {
 		return "", err
 	}
@@ -477,7 +510,7 @@ func (f *forge) openSpec(p *project, in actionInput) (string, error) {
 	if err := p.gitea.label(number, "spec"); err != nil {
 		return "", err
 	}
-	return fmt.Sprintf("spec #%d opened: the planner picks it up within %s", number, f.cfg.PollEvery), nil
+	return fmt.Sprintf("spec #%d opened: the planner picks it up within %s", number, f.settings().pollEvery()), nil
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {

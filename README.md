@@ -42,7 +42,7 @@ docker compose exec -T -u git gitea gitea admin user create --admin --username f
 
 # 3. Tokens: put the first in .env as GITEA_TOKEN, the second as GITEA_RUNNER_REGISTRATION_TOKEN
 docker compose exec -T -u git gitea gitea admin user generate-access-token \
-  -u forge -t orchestrator --scopes write:repository,write:issue --raw
+  -u forge -t orchestrator --scopes write:repository,write:issue,write:user --raw # write:user: creating projects from the UI
 docker compose exec -T -u git gitea gitea actions generate-runner-token
 
 # 4. Runner, agent image, orchestrator (tests run during its build; it creates the labels on startup)
@@ -60,9 +60,9 @@ Check it is up: `curl localhost:8000/health`.
 
 ### Projects
 
-Every Gitea repo with the `forge` topic is a project. Add one with `./new-project.sh NAME [SPEC_FILE]`, no restart needed; with a spec file it also opens it as a `spec` issue.
+Every Gitea repo with the `forge` topic is a project. Add one with `./new-project.sh NAME [SPEC_FILE]` or from the forge UI (**＋ Project**: an empty repo, an import from a clone URL, or an existing Gitea repo), no restart needed; with a spec file the script also opens it as a `spec` issue.
 
-To keep a copy on GitHub, GitLab, Azure DevOps or any HTTPS git host, create an empty repo there and run `MIRROR_TOKEN=<token with write access> ./mirror.sh NAME https://host/owner/repo.git` (for GitLab add `MIRROR_USER=oauth2`). Gitea then pushes every branch and tag on each commit. It is one-way: issues and specs stay in Gitea, and anything pushed to the remote directly is overwritten.
+To keep a copy on GitHub, GitLab, Azure DevOps or any HTTPS git host, create an empty repo there, then add it in the forge UI (project tab › Remote mirrors) or run `MIRROR_TOKEN=<token with write access> ./mirror.sh NAME https://host/owner/repo.git` (for GitLab add `MIRROR_USER=oauth2`). Gitea then pushes every branch and tag on each commit. It is one-way: issues and specs stay in Gitea, and anything pushed to the remote directly is overwritten.
 
 Worked example with every step shown: [`examples/url-shortener/WALKTHROUGH.md`](examples/url-shortener/WALKTHROUGH.md) (`./new-project.sh shortener examples/url-shortener/spec.md`).
 
@@ -103,12 +103,14 @@ Once a project has a `Dockerfile` (the planner adds one when a spec describes a 
 | `POLL_SECONDS` | `30` | How often the orchestrator polls Gitea. |
 | `MAX_AGENTS` | `2` in `.env.example` | Specs and stories worked on at once, across all projects. Keep `runner/config.yaml` capacity at least 4 times as high: each commit runs 4 CI jobs. |
 | `MAX_COST_PER_SPEC` | `20` | USD; a spec's remaining stories are blocked once its agents cost more. |
+
+`POLL_SECONDS`, `MAX_AGENTS` and `MAX_COST_PER_SPEC` are defaults: changes made in the forge UI (**⚙ Settings**) apply at once, are saved in the `orchestrator-data` volume and win over `.env`. Delete `/data/settings.json` there to go back to `.env`.
 | `PROTECTED_PATHS` | `.gitea/` | Comma-separated path prefixes a PR must not touch; such a PR is blocked, never merged. |
 
 ## Operations
 
 - **Logs:** `docker compose logs -f orchestrator runner`
-- **Forge UI:** http://localhost:8000 shows projects, specs and stories with their pipeline step and live agent activity, and has buttons to retry, set a spec's budget and open a spec (localhost only).
+- **Forge UI:** http://localhost:8000 shows projects, specs and stories with their pipeline step and live agent activity, and one tab per project, and has buttons to retry, set a spec's budget, open a spec, add a project, manage push mirrors and change the settings (localhost only).
 - **Status:** `curl localhost:8000/health` lists issues being worked on, as `owner/repo#n`.
 - **CI template change:** the orchestrator protects `main` against every push, so update each existing project's `.gitea/workflows/ci.yml` from `templates/ci.yml` through a PR merged in the web UI.
 

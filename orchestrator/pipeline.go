@@ -168,7 +168,7 @@ func (o *project) treeOf(branch string) (map[string]string, error) {
 
 // waitCI polls the combined commit status of sha until CI reaches a final state.
 func (o *project) waitCI(sha string) (string, error) {
-	for deadline := time.Now().Add(ciTimeout); time.Now().Before(deadline); time.Sleep(o.cfg.PollEvery) {
+	for deadline := time.Now().Add(ciTimeout); time.Now().Before(deadline); time.Sleep(o.settings().pollEvery()) {
 		state, err := o.gitea.ciState(sha)
 		if err != nil {
 			return "", err

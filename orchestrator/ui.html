@@ -84,6 +84,23 @@ input[type=number] { width: 90px; }
 details > summary { cursor: pointer; color: var(--muted); font-size: 13px; padding: 4px 0; }
 .empty { color: var(--muted); font-style: italic; }
 .error { color: var(--bad); }
+nav.tabs { display: flex; gap: 4px; overflow-x: auto; padding: 0 16px; background: var(--panel); border-bottom: 1px solid var(--line);
+  position: sticky; top: var(--head-h, 53px); z-index: 2; }
+nav.tabs a { display: inline-flex; gap: 6px; align-items: center; padding: 9px 12px; color: var(--muted); border-bottom: 2px solid transparent; white-space: nowrap; }
+nav.tabs a:hover { color: var(--text); text-decoration: none; }
+nav.tabs a[aria-current=page] { color: var(--text); border-bottom-color: var(--accent); font-weight: 600; }
+.badge { font-size: 11px; padding: 0 6px; border-radius: 999px; background: var(--todo); color: var(--text); font-weight: 600; }
+.badge.live { background: color-mix(in srgb, var(--accent) 25%, transparent); }
+.badge.bad { background: var(--bad); color: #fff; }
+.grid-form { display: grid; gap: 10px; max-width: 560px; }
+.grid-form label { display: grid; gap: 4px; }
+.grid-form input:not([type=radio]), .grid-form select { width: 100%; }
+.modes { display: flex; flex-wrap: wrap; gap: 6px 16px; border: 0; padding: 0; margin: 0; }
+.modes label { display: inline-flex; gap: 6px; align-items: center; }
+table.mirrors { width: 100%; border-collapse: collapse; font-size: 13px; }
+table.mirrors td, table.mirrors th { text-align: left; padding: 6px 8px 6px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+table.mirrors td.addr { overflow-wrap: anywhere; }
+.table-wrap { overflow-x: auto; }
 #toast { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); max-width: calc(100% - 32px); padding: 10px 16px;
   border-radius: 8px; background: var(--text); color: var(--bg); box-shadow: 0 4px 20px #0004; opacity: 0; pointer-events: none; transition: opacity .2s; z-index: 3; }
 #toast.show { opacity: 1; }
@@ -97,6 +114,7 @@ details > summary { cursor: pointer; color: var(--muted); font-size: 13px; paddi
   <span class="pill" id="slots"></span>
   <span class="pill" id="updated"></span>
 </header>
+<nav class="tabs" id="tabs" aria-label="Projects"></nav>
 <main id="app"><p class="empty">Loading…</p></main>
 <div id="toast" role="status" aria-live="polite"></div>
 <script>
@@ -181,18 +199,109 @@ function projectSection(p) {
         <label>Spec (Markdown: concrete, testable behaviour; see the forge-spec skill)<textarea name="body" required></textarea></label>
         <div><button class="primary" type="submit">Open spec</button> <span class="meta">The planner starts right away: this starts paid agent runs.</span></div>
       </form></details>
+    ${mirrorsCard(p)}
     ${done.length ? `<details data-key="${esc(doneKey)}"${open.has(doneKey) ? " open" : ""}><summary>${done.length} finished spec${done.length > 1 ? "s" : ""}</summary>
       ${done.map((s) => specCard(p, s)).join("")}</details>` : ""}</section>`;
 }
 
+function mirrorsCard(p) {
+  const key = `mirrors:${p.name}`;
+  const rows = p.mirrors.map((m) => `<tr><td class="addr">${esc(m.remote_address)}</td>
+      <td>${m.last_update && !m.last_update.startsWith("0001") ? esc(new Date(m.last_update).toLocaleString()) : "never"}</td>
+      <td>${m.last_error ? `<span class="error">${esc(m.last_error)}</span>` : "ok"}</td>
+      <td><button class="danger" data-act="mirror-remove" data-project="${esc(p.name)}" data-remote="${esc(m.remote_name)}">Remove</button></td></tr>`).join("");
+  const broken = p.mirrors.some((m) => m.last_error);
+  return `<details class="card" data-key="${esc(key)}"${open.has(key) ? " open" : ""}>
+    <summary>Remote mirrors (${p.mirrors.length})${broken ? ` <span class="badge bad">error</span>` : ""}</summary>
+    <p class="meta">One-way push of every branch and tag on each commit and every 8h. The forge stays the source of truth:
+      anything pushed to the remote directly is overwritten.</p>
+    ${p.mirrorError ? `<p class="error">Could not read the mirrors: ${esc(p.mirrorError)}</p>` : ""}
+    ${rows ? `<div class="table-wrap"><table class="mirrors"><thead><tr><th>Remote</th><th>Last sync</th><th>Status</th><th></th></tr></thead>
+      <tbody>${rows}</tbody></table></div>
+      <p><button data-act="mirror-sync" data-project="${esc(p.name)}">Sync now</button></p>` : `<p class="empty">No mirror.</p>`}
+    <form class="grid-form" data-act="mirror-add" data-project="${esc(p.name)}">
+      <label>Remote URL (the repo must exist and be empty) <input name="url" type="url" required placeholder="https://github.com/org/repo.git"></label>
+      <label>Token with write access <input name="token" type="password" required autocomplete="off"></label>
+      <label>User <input name="user" placeholder="forge (GitLab: oauth2)" autocomplete="off"></label>
+      <div><button class="primary" type="submit">Add mirror</button>
+        <span class="meta">GitHub: PAT with contents:write · GitLab: write_repository · Azure DevOps: Code (Read &amp; write)</span></div>
+    </form></details>`;
+}
+
+function newProjectView() {
+  let mode = "create";
+  try { mode = sessionStorage.getItem("mode") || mode; } catch {}
+  const radio = (v, label) => `<label><input type="radio" name="mode" value="${v}"${mode === v ? " checked" : ""}> ${label}</label>`;
+  const adopt = state.adoptable.map((n) => `<option value="${esc(n)}">${esc(n)}</option>`).join("");
+  return `<section class="card"><h2 style="margin-top:0;font-size:16px">New forge project</h2>
+    <form class="grid-form" data-act="project">
+      <fieldset class="modes"><legend class="meta">Start from</legend>
+        ${radio("create", "an empty repo")}${radio("import", "a clone URL")}${radio("adopt", "a Gitea repo")}</fieldset>
+      ${mode === "adopt" ? (adopt ? `<label>Repository <select name="name" required>${adopt}</select></label>`
+          : `<p class="empty">Every Gitea repo you administer is already a forge project.</p>`)
+        : `<label>Name <input name="name" required pattern="[A-Za-z0-9][A-Za-z0-9._\-]{0,99}" maxlength="100" autocomplete="off"></label>`}
+      ${mode === "import" ? `<label>Clone URL <input name="cloneURL" type="url" required placeholder="https://github.com/org/repo.git"></label>
+        <label>Token, for a private repo (used once, not stored) <input name="token" type="password" autocomplete="off"></label>
+        <label>User <input name="user" placeholder="oauth2" autocomplete="off"></label>` : ""}
+      <p class="meta">The forge adds the agents' deploy key and its CI workflow${mode === "create" ? "" : " (it replaces any .gitea/workflows/ci.yml)"},
+        then protects the default branch: from then on only the forge merges into it.</p>
+      <div><button class="primary" type="submit"${mode === "adopt" && !adopt ? " disabled" : ""}>${mode === "import" ? "Import" : mode === "adopt" ? "Adopt" : "Create"}</button></div>
+    </form></section>`;
+}
+
+function settingsView() {
+  const s = state.settings, d = state.defaults;
+  const field = (name, label, value, def, attrs) => `<label>${label} <input type="number" name="${name}" value="${value}" ${attrs} required>
+    <span class="meta">.env default: ${def}</span></label>`;
+  return `<section class="card"><h2 style="margin-top:0;font-size:16px">Forge settings</h2>
+    <form class="grid-form" data-act="settings">
+      ${field("maxAgents", "Agents at once, across all projects", s.maxAgents, d.maxAgents, 'min="1" max="20" step="1"')}
+      ${field("maxCostPerSpec", "Default budget per spec ($)", s.maxCostPerSpec, money(d.maxCostPerSpec), 'min="1" max="1000" step="0.5"')}
+      ${field("pollSeconds", "Poll Gitea every (seconds)", s.pollSeconds, d.pollSeconds + "s", 'min="1" max="3600" step="1"')}
+      <p class="meta">Applied at once and saved: they outlive a restart. Fewer agents never stops a running one. Keep the runner
+        capacity (runner/config.yaml) at least 4 times the agents: each commit runs 4 CI jobs. A new default budget applies to every
+        spec without its own.</p>
+      <div><button class="primary" type="submit">Save</button></div>
+    </form></section>`;
+}
+
+// The tab shown, from the URL hash: #p=owner/repo, #new or #settings.
+function view() {
+  const h = decodeURIComponent(location.hash.slice(1));
+  if (h === "new" || h === "settings") return h;
+  const name = h.startsWith("p=") ? h.slice(2) : "";
+  return state.projects.some((p) => p.name === name) ? name : state.projects[0]?.name || "new";
+}
+
+function tabs(current) {
+  const tab = (href, label, on) => `<a href="#${href}"${on ? ' aria-current="page"' : ""}>${label}</a>`;
+  return state.projects.map((p) => {
+    const live = state.running.filter((k) => k.startsWith(p.name + "#")).length;
+    const blocked = p.specs.reduce((n, s) => n + (s.blocked ? 1 : 0) + s.stories.filter((st) => st.blocked).length, 0);
+    const active = p.specs.filter((s) => s.phase !== "done").length;
+    return tab("p=" + encodeURIComponent(p.name), `${esc(p.name.split("/").pop())}
+      ${active ? `<span class="badge" title="specs in progress">${active}</span>` : ""}
+      ${live ? `<span class="badge live" title="agents running">🤖 ${live}</span>` : ""}
+      ${blocked || p.error ? `<span class="badge bad" title="blocked">⛔ ${blocked || "!"}</span>` : ""}`, p.name === current);
+  }).join("") + tab("new", "＋ Project", current === "new") + tab("settings", "⚙ Settings", current === "settings");
+}
+
 function render() {
   if (!state) return;
-  document.getElementById("slots").textContent = `${state.running.length} / ${state.maxAgents} agent slots busy`;
+  document.getElementById("slots").textContent = `${state.running.length} / ${state.settings.maxAgents} agent slots busy`;
+  const current = view();
+  document.getElementById("tabs").innerHTML = tabs(current);
   // Never wipe what the user is typing: refresh again once they leave the field.
   const typing = document.activeElement && document.activeElement.closest("form") && app.contains(document.activeElement);
-  if (typing) return;
-  app.innerHTML = state.projects.map(projectSection).join("") || `<p class="empty">No forge project yet: create one with the forge-spec skill.</p>`;
+  if (typing && app.dataset.view === current) return;
+  app.dataset.view = current;
+  const p = state.projects.find((p) => p.name === current);
+  app.innerHTML = current === "new" ? newProjectView() : current === "settings" ? settingsView() : projectSection(p);
 }
+
+window.addEventListener("hashchange", () => { document.activeElement?.blur(); render(); });
+new ResizeObserver(() => document.documentElement.style.setProperty("--head-h", document.querySelector("header").offsetHeight + "px"))
+  .observe(document.querySelector("header"));
 
 async function refresh() {
   const conn = document.getElementById("conn");
@@ -237,6 +346,10 @@ app.addEventListener("click", (e) => {
   const number = Number(b.dataset.number), project = b.dataset.project;
   if (b.dataset.act === "retry") {
     if (confirm(`Retry #${number}? This starts paid agent runs.`)) act("/api/retry", { project, number }, b);
+  } else if (b.dataset.act === "mirror-sync") {
+    act("/api/mirror", { project, action: "sync" }, b);
+  } else if (b.dataset.act === "mirror-remove") {
+    if (confirm(`Stop mirroring ${project} to this remote? The remote keeps what it has.`)) act("/api/mirror", { project, action: "remove", remote: b.dataset.remote }, b);
   } else if (b.dataset.act === "retry-fresh") {
     if (confirm(`Retry #${number} from scratch? Its branch and pull request are deleted and the tester starts over. This starts paid agent runs.`))
       act("/api/retry", { project, number, fresh: true }, b);
@@ -258,8 +371,27 @@ app.addEventListener("submit", async (e) => {
       ok = await act("/api/spec", { project, title: data.get("title"), body: data.get("body") }, button);
       if (ok) { f.reset(); open.delete(`new:${project}`); }
     }
+  } else if (f.dataset.act === "mirror-add") {
+    ok = await act("/api/mirror", { project, action: "add", url: data.get("url"), user: data.get("user"), token: data.get("token") }, button);
+    if (ok) f.reset();
+  } else if (f.dataset.act === "settings") {
+    ok = await act("/api/settings", { maxAgents: Number(data.get("maxAgents")), maxCostPerSpec: Number(data.get("maxCostPerSpec")),
+      pollSeconds: Number(data.get("pollSeconds")) }, button);
+  } else if (f.dataset.act === "project") {
+    const mode = data.get("mode"), name = data.get("name");
+    if (confirm(`${mode === "import" ? "Import" : mode === "adopt" ? "Adopt" : "Create"} ${name} as a forge project? Its default branch becomes protected.`)) {
+      ok = await act("/api/project", { mode, name, cloneURL: data.get("cloneURL") || "", user: data.get("user") || "", token: data.get("token") || "" }, button);
+      if (ok) { f.reset(); location.hash = ""; }
+    }
   }
   if (ok) document.activeElement.blur();
+});
+
+app.addEventListener("change", (e) => {
+  if (e.target.name !== "mode") return;
+  try { sessionStorage.setItem("mode", e.target.value); } catch {}
+  document.activeElement.blur();
+  render();
 });
 
 app.addEventListener("toggle", (e) => {
