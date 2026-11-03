@@ -30,7 +30,7 @@ func (o *project) land(is issue, pr *pullRequest, branch, head string) (string, 
 		if state, err := o.waitCI(head); err != nil {
 			return "", err
 		} else if state != "success" {
-			return fmt.Sprintf("The review approved your work, but after merging the latest `%s` into your branch, CI is `%s` (%s): your change and the stories merged meanwhile do not work together. Fix it.", o.base, state, pr.HTMLURL), nil
+			return fmt.Sprintf("The review approved your work, but after merging the latest `%s` into your branch, CI is `%s` (%s): your change and the stories merged meanwhile do not work together. Fix it.", o.base, state, pr.HTMLURL) + o.ciLog(head), nil
 		}
 	}
 	previous, err := o.gitea.branchHead(o.base)

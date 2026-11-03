@@ -3,7 +3,11 @@ package main
 import (
 	"errors"
 	"fmt"
+	"io"
+	"maps"
 	"net/http"
+	"regexp"
+	"strings"
 	"time"
 )
 
@@ -56,6 +60,62 @@ func (g *gitea) ciState(sha string) (string, error) {
 	}
 	err := g.call("GET", "/commits/"+sha+"/status", nil, &status)
 	return status.State, err
+}
+
+var (
+	logStamp = regexp.MustCompile(`(?m)^\S+Z `)
+	ansi     = regexp.MustCompile(`\x1b\[[0-9;]*m`)
+)
+
+// failedCILog returns the end of each failed CI job's log on sha, up to its runner's `exitcode` line. Gitea 1.22's API
+// has no job logs, so it reads the web UI's log route, which takes the same token.
+func (g *gitea) failedCILog(sha string, lines int) (string, error) {
+	var statuses []struct {
+		Status    string `json:"status"`
+		Context   string `json:"context"`
+		TargetURL string `json:"target_url"`
+	}
+	if err := g.call("GET", "/commits/"+sha+"/statuses?limit=50", nil, &statuses); err != nil {
+		return "", err
+	}
+	root, _, _ := strings.Cut(g.base, "/api/v1")
+	seen := map[string]bool{}
+	var out strings.Builder
+	for _, s := range statuses {
+		if (s.Status != "failure" && s.Status != "error") || s.TargetURL == "" || seen[s.TargetURL] {
+			continue
+		}
+		seen[s.TargetURL] = true
+		req, err := http.NewRequest("GET", root+s.TargetURL+"/logs", nil)
+		if err != nil {
+			return "", err
+		}
+		maps.Copy(req.Header, g.header)
+		resp, err := g.http.Do(req)
+		if err != nil {
+			return "", err
+		}
+		data, err := io.ReadAll(io.LimitReader(resp.Body, 32<<20))
+		resp.Body.Close()
+		if err != nil {
+			return "", err
+		}
+		if resp.StatusCode != http.StatusOK {
+			return "", fmt.Errorf("gitea GET %s/logs: %s", s.TargetURL, resp.Status)
+		}
+		fmt.Fprintf(&out, "%s:\n%s\n", s.Context, tailBeforeExit(string(data), lines))
+	}
+	return out.String(), nil
+}
+
+// tailBeforeExit cleans a job log and keeps its last lines before the runner's `exitcode` line (the post-step noise).
+func tailBeforeExit(log string, lines int) string {
+	log = ansi.ReplaceAllString(logStamp.ReplaceAllString(log, ""), "")
+	if i := strings.Index(log, "exitcode '"); i >= 0 {
+		log = log[:i]
+	}
+	all := strings.Split(strings.TrimRight(log, "\n"), "\n")
+	return strings.Join(all[max(0, len(all)-lines):], "\n")
 }
 
 // merge squash-merges pr, only if its branch is still at head: what was checked is what gets merged.

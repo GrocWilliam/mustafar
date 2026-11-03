@@ -35,7 +35,7 @@ Read the issue and all its comments (`api GET "/repos/$repo/issues/$n"` and `...
 
 Get the label ids from `api GET "/repos/$repo/labels"`. Remove `us-blocked` (`api DELETE "/repos/$repo/issues/$n/labels/$BLOCKED_ID"`), then add the label to resume from (`api POST "/repos/$repo/issues/$n/labels" "{\"labels\": [$ID]}"`):
 
-- a story → `us-todo`: it resumes its branch `agent/us-<n>` when the dev had already worked on it (the tester is skipped and its tests stay frozen), otherwise it starts over from the tester. Delete the branch to force a fresh start (`api DELETE "/repos/$repo/branches/agent%2Fus-$n"`), e.g. when the tests themselves were wrong;
+- a story → `us-todo`: it resumes its branch `agent/us-<n>` when the dev had already worked on it (the tester is skipped and its tests stay frozen), otherwise it starts over from the tester. If CI had failed on the branch, the orchestrator merges `main` into it for a fresh CI run; when `main` has not moved there is nothing to merge, so a retry for a flaky CI failure goes straight to the dev with the old failure (rerun the job in the Gitea UI first, or let `main` move). Delete the branch to force a fresh start (`api DELETE "/repos/$repo/branches/agent%2Fus-$n"`), e.g. when the tests themselves were wrong;
 - a spec whose planning failed → `spec`: planned again (a failed plan's stories were closed);
 - a spec over budget → `spec-active`, then `us-todo` on each of its blocked stories.
 

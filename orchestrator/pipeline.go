@@ -81,11 +81,17 @@ func (o *project) attempt(is issue, branch string, baseTree, testerTree map[stri
 		}
 		return msg, nil
 	}
-	head, err := o.gitea.branchHead(branch)
+	pr, err := o.ensurePR(is, branch)
 	if err != nil {
 		return "", err
 	}
-	pr, err := o.ensurePR(is, branch)
+	if skipDev {
+		// Gitea never reruns CI on an unchanged commit: a retry after a flaky failure needs a new head to get a fresh run.
+		if err := o.freshCI(is, branch, pr); err != nil {
+			return "", err
+		}
+	}
+	head, err := o.gitea.branchHead(branch)
 	if err != nil {
 		return "", err
 	}
@@ -118,7 +124,7 @@ func (o *project) attempt(is issue, branch string, baseTree, testerTree map[stri
 		return "", err
 	}
 	if state != "success" {
-		return fmt.Sprintf("CI is `%s` on your last commit (%s): `make test` or an acceptance test `run.sh` fails. Reproduce and fix.", state, pr.HTMLURL), nil
+		return fmt.Sprintf("CI is `%s` on your last commit (%s): `make test` or an acceptance test `run.sh` fails. Reproduce and fix.", state, pr.HTMLURL) + o.ciLog(head), nil
 	}
 
 	ok, review, err := o.runAgent("reviewer", is, "")
@@ -172,6 +178,38 @@ func (o *project) waitCI(sha string) (string, error) {
 		}
 	}
 	return "", fmt.Errorf("no CI result after %s: is the runner up?", ciTimeout)
+}
+
+// freshCI merges the base branch into a resumed branch whose last CI failed, so CI runs again on the new merge commit.
+// It does nothing when CI did not fail or the branch already contains the base: the dev then gets the failure.
+func (o *project) freshCI(is issue, branch string, pr *pullRequest) error {
+	head, err := o.gitea.branchHead(branch)
+	if err != nil {
+		return err
+	}
+	if state, err := o.gitea.ciState(head); err != nil || (state != "failure" && state != "error") {
+		return err
+	}
+	behind, err := o.gitea.behind(branch, o.base)
+	if err != nil || behind == 0 {
+		return err
+	}
+	if err := o.gitea.updatePR(pr.Number); errors.Is(err, errConflict) {
+		return nil // the dev gets the CI failure, and the conflict once it merges main
+	} else if err != nil {
+		return err
+	}
+	_, err = o.gitea.comment(is.Number, fmt.Sprintf("🔄 CI had failed on the resumed branch: merged `%s` into it for a fresh CI run.", o.base))
+	return err
+}
+
+// ciLog is the end of the failed CI jobs' logs on sha, as feedback for the dev; empty if Gitea cannot give it.
+func (o *project) ciLog(sha string) string {
+	log, err := o.gitea.failedCILog(sha, 60)
+	if err != nil || log == "" {
+		return ""
+	}
+	return "\n\nEnd of the failed CI job's log:\n\n```\n" + clip(log, 6000) + "\n```"
 }
 
 func agentFailure(role string, err error) error {
