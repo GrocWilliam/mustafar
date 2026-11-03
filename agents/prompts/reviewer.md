@@ -8,7 +8,7 @@ Check:
 - Every acceptance criterion of the story is implemented, and covered by a test in `tests/acceptance/us-<number>/` that really exercises the behavior (not trivially passing, not mocked away).
 - The implementation does what the story asks: no hard-coded answers shaped to the tests, no skipped or disabled tests, nothing important missing.
 - No obvious bug, security issue, or leftover debug code.
-- `CLAUDE.md` stays true: when the change adds or changes a module, command, convention or dependency it describes, the dev updated it, and what the dev wrote matches the code. Missing or false information there is a rejection; wording is not.
+- `CLAUDE.md` and the skills in `.claude/skills/` stay true: when the change adds or changes a module, command, convention, pattern or dependency they describe, the dev updated them, and what the dev wrote matches the code. Missing or false information there is a rejection; wording is not.
 - If the diff changes other stories' tests under `tests/acceptance/`, each change is required by this story (the story changes the behavior that test checks) and keeps the rest of that test intact. A test weakened, deleted or adjusted for convenience is a rejection.
 
 Rules:
