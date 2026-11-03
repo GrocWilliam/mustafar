@@ -3,6 +3,8 @@ FROM ci
 RUN npm install -g @anthropic-ai/claude-code
 COPY --chmod=755 agent.sh /usr/local/bin/agent.sh
 COPY prompts /prompts
+# Forge-wide how-tos (stack-*): personal skills, so they apply in every project. A project's own skills and CLAUDE.md win.
+COPY --chown=node:node skills /home/node/.claude/skills
 # Claude Code refuses bypassPermissions as root.
 USER node
 WORKDIR /home/node

@@ -27,6 +27,11 @@ make build    # if the app has a build step
 # how to run one story's acceptance test, how to run the app
 ```
 
+## Skills
+
+The forge's defaults are the `stack-ui`, `stack-api`, `stack-db`, `stack-tests` and `stack-i18n` skills. Where this
+project differs, say so here; project-specific how-tos go in `.claude/skills/`.
+
 ## Pitfalls
 
 <!-- One line per trap that cost an attempt: what happened, what to do instead. -->
