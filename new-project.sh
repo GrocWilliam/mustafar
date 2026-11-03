@@ -23,6 +23,8 @@ api POST "$repo/keys" "{\"title\": \"agents\", \"key\": $(json "$(cat secrets/de
 # Before the topic: once the orchestrator sees the project, it protects main against every push.
 api POST "$repo/contents/.gitea/workflows/ci.yml" \
   "{\"message\": \"ci: add workflow\", \"content\": \"$(base64 -w0 templates/ci.yml)\"}" >/dev/null
+api POST "$repo/contents/CLAUDE.md" \
+  "{\"message\": \"docs: add the agents' CLAUDE.md\", \"content\": \"$(base64 -w0 templates/CLAUDE.md)\"}" >/dev/null
 api PUT "$repo/topics/forge" >/dev/null
 echo "created http://gitea:3000/$owner/$name"
 [ -n "$spec" ] || exit 0

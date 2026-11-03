@@ -15,7 +15,7 @@ type config struct {
 	SSHBase                                 string
 	AgentImage, AgentNetwork, DeployKeyFile string
 	// DeployKeyPubFile and CITemplate are what a project created from the UI gets: the agents' key, the CI workflow.
-	DeployKeyPubFile, CITemplate string
+	DeployKeyPubFile, CITemplate, MemoryTemplate string
 	// Defaults are the .env settings; SettingsFile holds the UI's changes, which win (settings.go).
 	Defaults     settings
 	SettingsFile string
@@ -35,6 +35,7 @@ func loadConfig() (config, error) {
 		DeployKeyFile:    env("DEPLOY_KEY_FILE", "/run/secrets/deploy_key"),
 		DeployKeyPubFile: env("DEPLOY_KEY_PUB_FILE", "/run/secrets/deploy_key.pub"),
 		CITemplate:       env("CI_TEMPLATE", "/templates/ci.yml"),
+		MemoryTemplate:   env("MEMORY_TEMPLATE", "/templates/CLAUDE.md"),
 		SettingsFile:     env("SETTINGS_FILE", "/data/settings.json"),
 	}
 	if c.GiteaToken == "" {

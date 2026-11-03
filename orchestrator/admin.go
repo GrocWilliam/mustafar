@@ -98,8 +98,16 @@ func (f *forge) setUpProject(fullName string) error {
 	if err != nil {
 		return err
 	}
-	if err := g.putFile(".gitea/workflows/ci.yml", "ci: add the forge workflow", ci); err != nil {
+	if err := g.putFile(".gitea/workflows/ci.yml", "ci: add the forge workflow", ci, true); err != nil {
 		return fmt.Errorf("CI workflow: %w", err)
+	}
+	memory, err := os.ReadFile(f.cfg.MemoryTemplate)
+	if err != nil {
+		return err
+	}
+	// The agents' memory, which they keep current: an existing one is the project's own, never replaced.
+	if err := g.putFile("CLAUDE.md", "docs: add the agents' CLAUDE.md", memory, false); err != nil {
+		return fmt.Errorf("CLAUDE.md: %w", err)
 	}
 	// Last: once the orchestrator sees the topic, it protects the default branch against every push.
 	return g.call("PUT", "/topics/"+projectTopic, nil, nil)
@@ -119,8 +127,8 @@ func orDefault(s, fallback string) string {
 	return fallback
 }
 
-// putFile commits content at path on the default branch, creating the file or replacing a different one.
-func (g *gitea) putFile(path, message string, content []byte) error {
+// putFile commits content at path on the default branch, creating the file or, with replace, replacing a different one.
+func (g *gitea) putFile(path, message string, content []byte, replace bool) error {
 	var existing struct {
 		SHA     string `json:"sha"`
 		Content string `json:"content"`
@@ -130,7 +138,7 @@ func (g *gitea) putFile(path, message string, content []byte) error {
 	switch {
 	case hasStatus(err, http.StatusNotFound):
 		return g.call("POST", "/contents/"+path, body, nil)
-	case err != nil:
+	case err != nil || !replace:
 		return err
 	}
 	if old, _ := base64.StdEncoding.DecodeString(strings.ReplaceAll(existing.Content, "\n", "")); string(old) == string(content) {

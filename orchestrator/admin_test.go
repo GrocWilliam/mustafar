@@ -43,6 +43,8 @@ func TestSetUpProjectIsIdempotent(t *testing.T) {
 	pub, ci := filepath.Join(dir, "key.pub"), filepath.Join(dir, "ci.yml")
 	os.WriteFile(pub, []byte("ssh-ed25519 AAAA agents@host\n"), 0o600)
 	os.WriteFile(ci, []byte("on: push\n"), 0o600)
+	memory := filepath.Join(dir, "CLAUDE.md")
+	os.WriteFile(memory, []byte("# Project memory\n"), 0o600)
 	var writes []string
 	done := false // whether the repo already has the key and the workflow
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -58,6 +60,10 @@ func TestSetUpProjectIsIdempotent(t *testing.T) {
 				http.NotFound(w, r)
 				return
 			}
+			if strings.HasSuffix(r.URL.Path, "CLAUDE.md") { // the project's own, different from the template: kept
+				w.Write([]byte(`{"sha": "def", "content": "` + base64.StdEncoding.EncodeToString([]byte("# Mine\n")) + `"}`))
+				return
+			}
 			w.Write([]byte(`{"sha": "abc", "content": "` + base64.StdEncoding.EncodeToString([]byte("on: push\n")) + `"}`))
 		default:
 			writes = append(writes, r.Method+" "+r.URL.Path[strings.Index(r.URL.Path, "/repos/"):])
@@ -65,11 +71,11 @@ func TestSetUpProjectIsIdempotent(t *testing.T) {
 		}
 	}))
 	defer srv.Close()
-	f := &forge{cfg: config{GiteaURL: srv.URL, GiteaToken: "t", DeployKeyPubFile: pub, CITemplate: ci}}
+	f := &forge{cfg: config{GiteaURL: srv.URL, GiteaToken: "t", DeployKeyPubFile: pub, CITemplate: ci, MemoryTemplate: memory}}
 	if err := f.setUpProject("forge/x"); err != nil {
 		t.Fatal(err)
 	}
-	want := "POST /repos/forge/x/keys,POST /repos/forge/x/contents/.gitea/workflows/ci.yml,PUT /repos/forge/x/topics/forge"
+	want := "POST /repos/forge/x/keys,POST /repos/forge/x/contents/.gitea/workflows/ci.yml,POST /repos/forge/x/contents/CLAUDE.md,PUT /repos/forge/x/topics/forge"
 	if got := strings.Join(writes, ","); got != want {
 		t.Fatalf("first setup wrote %s, want %s", got, want)
 	}
