@@ -41,6 +41,7 @@ The labels:
 | `us-in-progress` | The tester or the dev is working on it |
 | `us-review` | A pull request is open; CI and the reviewer are judging it |
 | `us-blocked` | Stopped. A human must look. |
+| `priority` | Added to a `us-todo` story: it takes the next free slot before older stories (the `forge-story` skill sets it) |
 
 Done means closed: a merged pull request closes its story, and a spec closes once all its stories are closed.
 

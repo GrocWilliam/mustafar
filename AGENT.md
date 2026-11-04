@@ -44,7 +44,7 @@ flowchart LR
 Labels: `spec`, `us-todo`, `us-in-progress`, `us-review`, `us-blocked`. "Done" = issue closed (the PR contains `Closes #N`).
 
 1. **Planning**: `spec` issue opened → `planner` creates the US in `us-todo` and comments the plan on the spec.
-2. **Dispatch**: the orchestrator takes the oldest `us-todo` US **whose dependencies are all closed**, up to `MAX_AGENTS` in parallel. The lock lives in the orchestrator's memory (the only label writer); the `us-in-progress` label is a trace, not a lock.
+2. **Dispatch**: the orchestrator takes the oldest `us-todo` US **whose dependencies are all closed** (those labelled `priority` first), up to `MAX_AGENTS` in parallel. The lock lives in the orchestrator's memory (the only label writer); the `us-in-progress` label is a trace, not a lock.
 3. **Tests then code**: `tester` then `dev` on the same branch; the orchestrator opens the PR and sets `us-review`.
 4. **CI gate** (Gitea Actions): tests green **and** `tests/acceptance/` identical to the tester's commit.
 5. **Review**: `reviewer` runs once CI is green. `changes` or red CI → rerun `dev` with the feedback in context.

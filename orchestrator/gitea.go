@@ -15,6 +15,7 @@ var lifecycleLabels = map[string]string{
 	"us-in-progress": "#fbca04",
 	"us-review":      "#0e8a16",
 	"us-blocked":     "#d93f0b",
+	"priority":       "#b60205", // a `us-todo` story with it starts before the others
 }
 
 type issue struct {

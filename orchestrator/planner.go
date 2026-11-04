@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"slices"
 	"strings"
 )
 
@@ -106,7 +107,19 @@ func (o *project) readyStories(todo []issue) ([]issue, error) {
 		}
 		ready = append(ready, story)
 	}
+	slices.SortStableFunc(ready, byPriority)
 	return ready, nil
+}
+
+// byPriority puts the stories labelled `priority` first, keeping the oldest-first order otherwise.
+func byPriority(a, b issue) int {
+	switch pa, pb := a.hasLabel("priority"), b.hasLabel("priority"); {
+	case pa == pb:
+		return 0
+	case pa:
+		return -1
+	}
+	return 1
 }
 
 func (o *project) dependenciesClosed(is issue) bool {

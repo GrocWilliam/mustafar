@@ -67,7 +67,7 @@ Only the orchestrator writes labels; the label is a trace of the state, not a lo
 | --- | --- | --- |
 | `spec` | `spec-active` | Plan valid and stories created (still unlabelled until the plan is complete) |
 | `spec` | `us-blocked` | Planner failed or plan invalid; partial stories are closed |
-| `us-todo` | `us-in-progress` | A slot is free and the story is ready |
+| `us-todo` | `us-in-progress` | A slot is free and the story is ready; stories labelled `priority` first, then oldest first |
 | `us-in-progress` | `us-review` | First dev attempt committed; pull request opened |
 | `us-review` | closed | Merged and deployed (or no `Dockerfile` yet) |
 | any story label | `us-blocked` | 3 rejections, agent or infrastructure failure, failed deploy, spec over budget |

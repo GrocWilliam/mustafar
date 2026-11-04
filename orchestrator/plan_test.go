@@ -2,6 +2,7 @@ package main
 
 import (
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -84,5 +85,26 @@ func TestRefsAndMarkers(t *testing.T) {
 	costs := []string{"a <!-- forge:cost=0.2600 -->", "no cost", "b <!-- forge:cost=1.5 -->"}
 	if got := sumCosts(costs); got < 1.759 || got > 1.761 {
 		t.Fatalf("sumCosts = %v", got)
+	}
+}
+
+func TestByPriority(t *testing.T) {
+	story := func(n int, labels ...string) issue {
+		is := issue{Number: n}
+		for _, l := range labels {
+			is.Labels = append(is.Labels, struct {
+				Name string `json:"name"`
+			}{l})
+		}
+		return is
+	}
+	ready := []issue{story(3, "us-todo"), story(5, "us-todo", "priority"), story(4, "us-todo"), story(9, "priority", "us-todo")}
+	slices.SortStableFunc(ready, byPriority)
+	var got []int
+	for _, is := range ready {
+		got = append(got, is.Number)
+	}
+	if want := []int{5, 9, 3, 4}; !reflect.DeepEqual(got, want) {
+		t.Errorf("order = %v, want %v", got, want)
 	}
 }
