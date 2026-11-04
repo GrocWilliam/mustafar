@@ -10,12 +10,12 @@ description: Diagnose a blocked forge issue (`us-blocked` story or spec) and ret
 Work from the forge root. Never print the admin password or `.env` values.
 
 ```bash
-api() { curl -sf -X "$1" "http://gitea:3000/api/v1$2" -u "forge:$(cat secrets/gitea-admin-password)" -H 'Content-Type: application/json' ${3:+-d "$3"}; }
+api() { curl -sf -X "$1" "http://localhost:3000/api/v1$2" -u "forge:$(cat secrets/gitea-admin-password)" -H 'Content-Type: application/json' ${3:+-d "$3"}; }
 ```
 
 ## 1. Find out why
 
-Read the issue and all its comments (`api GET "/repos/$repo/issues/$n"` and `.../comments`): the last `⛔ Blocked:` comment gives the reason, the `🤖 Agent` summaries and `🔁 Attempt` feedback show the history. Open the PR and CI run if they matter (`http://gitea:3000/$repo/pulls`, `.../actions`). Then classify:
+Read the issue and all its comments (`api GET "/repos/$repo/issues/$n"` and `.../comments`): the last `⛔ Blocked:` comment gives the reason, the `🤖 Agent` summaries and `🔁 Attempt` feedback show the history. Open the PR and CI run if they matter (`http://localhost:3000/$repo/pulls`, `.../actions`). Then classify:
 
 | Reason says | Usually means | Fix |
 |---|---|---|

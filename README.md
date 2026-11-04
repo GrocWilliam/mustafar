@@ -29,10 +29,10 @@ spec issue ──planner──▶ us-todo stories (with dependencies)
 Requires Docker with Compose, `openssl`, `ssh-keygen`, `python3` (for `new-project.sh` and `bench.sh`), and a Claude API key or subscription token.
 
 ```bash
-# 1. Secrets, and one URL for Gitea everywhere (host, containers, CI jobs)
+# 1. Secrets (the host reaches Gitea on localhost:3000, containers on gitea:3000)
 cp .env.example .env                                  # fill in ANTHROPIC_API_KEY or CLAUDE_CODE_OAUTH_TOKEN
 mkdir -p secrets && ssh-keygen -t ed25519 -N '' -C forge-agents -f secrets/deploy_key
-echo '127.0.0.1 gitea' | sudo tee -a /etc/hosts
+echo '127.0.0.1 gitea' | sudo tee -a /etc/hosts    # optional: only for gitea:3000 links in the browser
 
 # 2. Gitea (no web wizard) and its admin user `forge`; the password lands in secrets/
 docker compose up -d gitea

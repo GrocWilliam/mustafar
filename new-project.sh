@@ -13,7 +13,7 @@ repo="/repos/$owner/$name"
 
 # Admin login: creating a repo needs the write:user scope, which the orchestrator token doesn't get.
 api() {
-  curl -sf -X "$1" "http://gitea:3000/api/v1$2" -u "forge:$(cat secrets/gitea-admin-password)" \
+  curl -sf -X "$1" "http://localhost:3000/api/v1$2" -u "forge:$(cat secrets/gitea-admin-password)" \
     -H 'Content-Type: application/json' ${3:+-d "$3"}
 }
 json() { python3 -c 'import json, sys; print(json.dumps(sys.argv[1]))' "$1"; }
@@ -26,7 +26,7 @@ api POST "$repo/contents/.gitea/workflows/ci.yml" \
 api POST "$repo/contents/CLAUDE.md" \
   "{\"message\": \"docs: add the agents' CLAUDE.md\", \"content\": \"$(base64 -w0 templates/CLAUDE.md)\"}" >/dev/null
 api PUT "$repo/topics/forge" >/dev/null
-echo "created http://gitea:3000/$owner/$name"
+echo "created http://localhost:3000/$owner/$name"
 [ -n "$spec" ] || exit 0
 
 # The orchestrator creates the labels on its next poll.
@@ -41,4 +41,4 @@ title=$(head -n1 "$spec" | sed 's/^# *//')
 body=$(tail -n +2 "$spec")
 number=$(api POST "$repo/issues" "{\"title\": $(json "$title"), \"body\": $(json "$body"), \"labels\": [$label]}" |
   python3 -c 'import json, sys; print(json.load(sys.stdin)["number"])')
-echo "spec opened: http://gitea:3000/$owner/$name/issues/$number"
+echo "spec opened: http://localhost:3000/$owner/$name/issues/$number"

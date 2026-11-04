@@ -10,7 +10,7 @@ Read-only: change nothing, start nothing.
 Run everything from the forge root (the directory holding `docker-compose.yml`), with this helper. Never print the admin password or `.env` values. Use `python3` to parse JSON (`jq` may be missing).
 
 ```bash
-api() { curl -sf -X "$1" "http://gitea:3000/api/v1$2" -u "forge:$(cat secrets/gitea-admin-password)" -H 'Content-Type: application/json' ${3:+-d "$3"}; }
+api() { curl -sf -X "$1" "http://localhost:3000/api/v1$2" -u "forge:$(cat secrets/gitea-admin-password)" -H 'Content-Type: application/json' ${3:+-d "$3"}; }
 ```
 
 ## Collect
@@ -36,4 +36,4 @@ api() { curl -sf -X "$1" "http://gitea:3000/api/v1$2" -u "forge:$(cat secrets/gi
 
 ## Report
 
-One short block per project: counts per label, what runs now, each blocked issue with its one-line reason and link (`http://gitea:3000/$repo/issues/$n`), specs with `done/total` stories and spend. Then drift, one line per project that has any (in sync projects are not listed), then service problems, if any. For a blocked issue, offer the `forge-unblock` skill; don't fix it here.
+One short block per project: counts per label, what runs now, each blocked issue with its one-line reason and link (`http://localhost:3000/$repo/issues/$n`), specs with `done/total` stories and spend. Then drift, one line per project that has any (in sync projects are not listed), then service problems, if any. For a blocked issue, offer the `forge-unblock` skill; don't fix it here.

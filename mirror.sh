@@ -14,7 +14,7 @@ name=${1:?usage: MIRROR_TOKEN=... $0 NAME REMOTE_URL}
 remote=${2:?usage: MIRROR_TOKEN=... $0 NAME REMOTE_URL}
 : "${MIRROR_TOKEN:?set MIRROR_TOKEN to a token with write access to $remote}"
 [[ $remote == https://* ]] || { echo "REMOTE_URL must be https://" >&2; exit 1; }
-repo="http://gitea:3000/api/v1/repos/forge/$name"
+repo="http://localhost:3000/api/v1/repos/forge/$name"
 auth="forge:$(cat secrets/gitea-admin-password)"
 
 # The body goes through stdin so the token never shows in `ps`.

@@ -27,7 +27,7 @@ flowchart TB
     RN -->|starts| CI
 ```
 
-All of them join the `forge` Docker network, where Gitea is `http://gitea:3000` and SSH listens on 22; the host reaches the same name through `/etc/hosts`. Gitea uses SQLite in the `gitea-data` volume. The `agent` service in `docker-compose.yml` only builds the `forge-agent` image; it never runs as a service.
+All of them join the `forge` Docker network, where Gitea is `http://gitea:3000` and SSH listens on 22; the host reaches it on `http://localhost:3000` (a `gitea` hosts entry is optional). Gitea uses SQLite in the `gitea-data` volume. The `agent` service in `docker-compose.yml` only builds the `forge-agent` image; it never runs as a service.
 
 ## Orchestrator internals
 

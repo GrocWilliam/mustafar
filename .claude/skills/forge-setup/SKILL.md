@@ -13,8 +13,8 @@ Secrets: never print `.env` values, tokens, the admin password or the private ke
 
 1. `.env` exists (else `cp .env.example .env`). `ANTHROPIC_API_KEY` or `CLAUDE_CODE_OAUTH_TOKEN` must be set: only the user has it, so ask them to fill it in themselves (`! $EDITOR .env`).
 2. `secrets/deploy_key` exists, else `ssh-keygen -t ed25519 -N '' -C forge-agents -f secrets/deploy_key`.
-3. `getent hosts gitea` resolves to 127.0.0.1. Else it needs sudo: ask the user to run `! echo '127.0.0.1 gitea' | sudo tee -a /etc/hosts`.
-4. `docker compose up -d gitea`, then wait until `curl -sf http://gitea:3000/api/healthz` answers.
+3. Optional: a `127.0.0.1 gitea` hosts entry only makes `http://gitea:3000` links open in the browser. The host tools use `http://localhost:3000`, so skip it when the user can't edit the hosts file.
+4. `docker compose up -d gitea`, then wait until `curl -sf http://localhost:3000/api/healthz` answers.
 5. Admin `forge`: if `secrets/gitea-admin-password` is missing, create it and the user as in README step 2.
 6. Tokens: if `GITEA_TOKEN` is empty, generate it (README step 3, scopes `write:repository,write:issue`) into `.env`; same for `GITEA_RUNNER_REGISTRATION_TOKEN`.
 7. `docker compose up -d runner && docker compose build agent && docker compose up --build -d orchestrator` (the orchestrator build runs `go vet` and the tests).

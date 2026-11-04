@@ -10,7 +10,7 @@ A spec is a Gitea issue labelled `spec` in a project (a repo with the `forge` to
 Work from the forge root. Never print the admin password or `.env` values.
 
 ```bash
-api() { curl -sf -X "$1" "http://gitea:3000/api/v1$2" -u "forge:$(cat secrets/gitea-admin-password)" -H 'Content-Type: application/json' ${3:+-d "$3"}; }
+api() { curl -sf -X "$1" "http://localhost:3000/api/v1$2" -u "forge:$(cat secrets/gitea-admin-password)" -H 'Content-Type: application/json' ${3:+-d "$3"}; }
 ```
 
 ## 1. Write the spec
@@ -22,7 +22,7 @@ Save it to a file in your scratchpad: first line `# Title`, then the body. Model
 - **Stack**: language and whether dependencies are allowed. CI and agents run Debian bookworm with Node 26, Python 3, make, git and Chromium (`$CHROMIUM_PATH`, for browser tests); anything else must be installable by `make test`.
 - **A service** must listen on port 8080 (or `$PORT`) and answer `GET /health` with 200: the planner then adds a `Dockerfile` and every merge is deployed to staging. Tests never use Docker.
 - **Size**: at most 20 stories of one ~30-turn dev session each. Split a bigger product into successive specs.
-- **Existing project**: read its code first (`git clone http://gitea:3000/$repo.git` into the scratchpad) and describe only the change, in the terms the code already uses.
+- **Existing project**: read its code first (`git clone http://localhost:3000/$repo.git` into the scratchpad) and describe only the change, in the terms the code already uses.
 
 Ask the user only about real gaps (stack, a business rule); state the other choices in the spec.
 
