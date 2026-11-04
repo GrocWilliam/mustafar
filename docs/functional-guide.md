@@ -77,7 +77,7 @@ Your job is to write good specs and to unblock what stops; everything between th
 4. **Follow progress in Gitea.** Each agent run shows one comment, edited live with its latest steps, then replaced by a summary with turns and cost. The spec's plan comment lists the stories in build order.
 5. **Try it on staging.** Once the project has a `Dockerfile`, each merge is deployed to `http://localhost:<9000 + repo id>`; the 🚀 comment gives the URL.
 6. **Check status.** The forge UI at http://localhost:8000 shows every project, spec and story, live: each story's pipeline step (Queued, Tests, Code, CI, Review, Merge, Done), its attempt and cost, what its agent is doing right now, and each spec's progress and spend against its budget. It refreshes every 5 seconds. The `forge-status` skill gives the same report in Claude Code.
-7. **Act from the UI.** Its buttons retry a blocked story (resuming its branch) or retry it from scratch (branch and pull request deleted), retry a blocked spec, set one spec's budget, and open a new spec. Each one asks for confirmation, since it starts paid agent runs. The UI listens on localhost only.
+7. **Act from the UI.** Its buttons retry a blocked story (resuming its branch) or retry it from scratch (branch and pull request deleted), retry a blocked spec, set one spec's budget, open a new spec, and add a story to a spec (with `priority`, ticked by default, it starts before the other queued stories). Each one asks for confirmation, since it starts paid agent runs. The UI listens on localhost only.
 
 The comments to recognise on an issue:
 

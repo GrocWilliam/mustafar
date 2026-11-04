@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -69,5 +70,23 @@ func TestActionNeedsHeader(t *testing.T) {
 	}
 	if called {
 		t.Error("the action ran without a known project")
+	}
+}
+
+func TestStoryBody(t *testing.T) {
+	ok := "Show traits.\n\nAcceptance criteria:\n- GET returns traits"
+	got, err := storyBody(" Traits ", ok+"\n", 91)
+	if err != nil || got != ok+"\n\n---\nPart of #91" {
+		t.Fatalf("storyBody = %q, %v", got, err)
+	}
+	for name, c := range map[string][2]string{
+		"no title":      {"", ok},
+		"no criteria":   {"Traits", "Show traits."},
+		"own Part of":   {"Traits", ok + "\n\nPart of #3"},
+		"title too big": {strings.Repeat("x", 201), ok},
+	} {
+		if _, err := storyBody(c[0], c[1], 91); !errors.Is(err, errBadRequest) {
+			t.Errorf("%s: err = %v, want a refusal", name, err)
+		}
 	}
 }

@@ -159,19 +159,20 @@ function here(u) {
 
 function storyItem(p, st) {
   const deps = st.deps.length ? ` · after ${st.deps.map((d) => "#" + d).join(", ")}` : "";
+  const priority = st.priority && st.state !== "closed" ? " · ⚡ priority" : "";
   const attempt = st.attempt > 1 && st.step > 0 && st.step < 6 ? ` · attempt ${st.attempt}/3` : "";
   const blocked = st.blocked ? `<div class="blocked-box"><p>⛔ ${esc(st.blocked)}</p>
       <button data-act="retry" data-project="${esc(p.name)}" data-number="${st.number}">Retry</button>
       <button class="danger" data-act="retry-fresh" data-project="${esc(p.name)}" data-number="${st.number}">Retry from scratch</button></div>` : "";
   return `<li class="story"><div class="story-line">
       <span class="story-title"><span class="num">#${st.number}</span> <a href="${esc(here(st.url))}" target="_blank" rel="noopener">${esc(st.title)}</a>
-      <span class="meta">${money(st.cost)}${attempt}${deps}</span></span>${stepsBar(st)}</div>${agentBox(st.agent)}${blocked}</li>`;
+      <span class="meta">${money(st.cost)}${priority}${attempt}${deps}</span></span>${stepsBar(st)}</div>${agentBox(st.agent)}${blocked}</li>`;
 }
 
 function specCard(p, s) {
   const total = s.stories.length;
   const over = s.cost > s.budget;
-  const key = `budget:${p.name}#${s.number}`;
+  const key = `budget:${p.name}#${s.number}`, storyKey = `story:${p.name}#${s.number}`;
   const blocked = s.blocked ? `<div class="blocked-box"><p>⛔ ${esc(s.blocked)}</p>
       <button data-act="retry" data-project="${esc(p.name)}" data-number="${s.number}">Retry spec</button></div>` : "";
   const stories = total ? `<ul class="stories">${s.stories.map((st) => storyItem(p, st)).join("")}</ul>`
@@ -189,6 +190,14 @@ function specCard(p, s) {
       <form class="inline" data-act="budget" data-project="${esc(p.name)}" data-number="${s.number}">
         <label>New budget ($) <input type="number" name="budget" min="1" max="1000" step="1" value="${Math.ceil(Math.max(s.budget, s.cost + 5))}" required></label>
         <button type="submit">Set</button></form></details>`}
+    <details data-key="${esc(storyKey)}"${open.has(storyKey) ? " open" : ""}><summary>Add a story</summary>
+      <form class="new-spec" data-act="story" data-project="${esc(p.name)}" data-number="${s.number}">
+        <label>Title <input name="title" maxlength="200" required style="width:100%"></label>
+        <label>Story (behaviour, then an <code>Acceptance criteria:</code> list; name any frozen test the tester must update; see the forge-story skill)
+          <textarea name="body" required placeholder="What to build and why.&#10;&#10;Acceptance criteria:&#10;- ..."></textarea></label>
+        <label><input type="checkbox" name="priority" checked> Priority: start before the other queued stories</label>
+        <div><button class="primary" type="submit">Add story</button> <span class="meta">The tester starts at the next free slot: this starts paid agent runs.</span></div>
+      </form></details>
     ${stories}</section>`;
 }
 
@@ -377,6 +386,12 @@ app.addEventListener("submit", async (e) => {
     if (confirm(`Open "${data.get("title")}" as a spec of ${project}? The planner starts right away (paid agent runs).`)) {
       ok = await act("/api/spec", { project, title: data.get("title"), body: data.get("body") }, button);
       if (ok) { f.reset(); open.delete(`new:${project}`); }
+    }
+  } else if (f.dataset.act === "story") {
+    const priority = data.get("priority") === "on";
+    if (confirm(`Add "${data.get("title")}" to spec #${f.dataset.number}${priority ? " with priority" : ""}? The tester starts at the next free slot (paid agent runs).`)) {
+      ok = await act("/api/story", { project, number: Number(f.dataset.number), title: data.get("title"), body: data.get("body"), priority }, button);
+      if (ok) { f.reset(); open.delete(`story:${project}#${f.dataset.number}`); }
     }
   } else if (f.dataset.act === "mirror-add") {
     ok = await act("/api/mirror", { project, action: "add", url: data.get("url"), user: data.get("user"), token: data.get("token") }, button);

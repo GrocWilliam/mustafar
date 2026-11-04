@@ -150,9 +150,10 @@ type uiStory struct {
 	URL    string `json:"url"`
 	State  string `json:"state"`
 	storyProgress
-	Deps  []int          `json:"deps"`
-	Agent *agentActivity `json:"agent,omitempty"`
-	Cost  float64        `json:"cost"`
+	Deps     []int          `json:"deps"`
+	Agent    *agentActivity `json:"agent,omitempty"`
+	Cost     float64        `json:"cost"`
+	Priority bool           `json:"priority"`
 }
 
 type uiSpec struct {
@@ -302,7 +303,7 @@ func (o *project) uiProject(activity map[string]agentActivity) (uiProject, error
 			}
 			story := uiStory{Number: n, Title: st.Title, URL: up.URL + fmt.Sprintf("/issues/%d", n), State: st.State,
 				storyProgress: progressOf(stComments, st.State, st.labelNames()), Deps: refs(dependsLine, st.Body),
-				Agent: agent(n), Cost: sumCosts(stComments)}
+				Agent: agent(n), Cost: sumCosts(stComments), Priority: slices.Contains(st.labelNames(), "priority")}
 			if story.Deps == nil {
 				story.Deps = []int{}
 			}
@@ -331,6 +332,7 @@ func (f *forge) serveUI() {
 	http.HandleFunc("POST /api/retry", f.action(f.retry))
 	http.HandleFunc("POST /api/budget", f.action(f.setBudget))
 	http.HandleFunc("POST /api/spec", f.action(f.openSpec))
+	http.HandleFunc("POST /api/story", f.action(f.addStory))
 	http.HandleFunc("POST /api/project", uiAction(f.addProject))
 	http.HandleFunc("POST /api/mirror", uiAction(f.mirror))
 	http.HandleFunc("POST /api/settings", uiAction(func(s settings) (string, error) {
@@ -348,6 +350,8 @@ type actionInput struct {
 	Budget  float64 `json:"budget"`
 	Title   string  `json:"title"`
 	Body    string  `json:"body"`
+	// Priority makes a story added by hand start before the other queued ones.
+	Priority bool `json:"priority"`
 }
 
 // errBadRequest marks an action refused because of its input or the issue's state, not a failure.
@@ -511,6 +515,53 @@ func (f *forge) openSpec(p *project, in actionInput) (string, error) {
 		return "", err
 	}
 	return fmt.Sprintf("spec #%d opened: the planner picks it up within %s", number, f.settings().pollEvery()), nil
+}
+
+// storyBody checks a story written by hand and attaches it to its spec, as the planner's stories are.
+func storyBody(title, body string, spec int) (string, error) {
+	title, body = strings.TrimSpace(title), strings.TrimSpace(body)
+	if title == "" || len(title) > 200 || body == "" {
+		return "", refuse("a story needs a title (at most 200 characters) and a body")
+	}
+	if !criteriaList.MatchString(body) {
+		return "", refuse("a story needs an `Acceptance criteria:` line followed by a list")
+	}
+	if len(refs(partOfLine, body)) > 0 {
+		return "", refuse("leave out the `Part of` line: the story is added to spec #%d", spec)
+	}
+	return fmt.Sprintf("%s\n\n---\nPart of #%d", body, spec), nil
+}
+
+// addStory opens a `us-todo` story under a spec, skipping the planner; with priority it starts before the queue.
+func (f *forge) addStory(p *project, in actionInput) (string, error) {
+	body, err := storyBody(in.Title, in.Body, in.Number)
+	if err != nil {
+		return "", err
+	}
+	spec, err := p.gitea.getIssue(in.Number)
+	if err != nil {
+		return "", err
+	}
+	if len(refs(partOfLine, spec.Body)) > 0 {
+		return "", refuse("#%d is a story, not a spec", in.Number)
+	}
+	number, err := p.gitea.createIssue(strings.TrimSpace(in.Title), body)
+	if err != nil {
+		return "", err
+	}
+	if in.Priority { // before us-todo, so no poll picks it up without its priority
+		if err := p.gitea.label(number, "priority"); err != nil {
+			return "", err
+		}
+	}
+	if err := p.gitea.label(number, "us-todo"); err != nil {
+		return "", err
+	}
+	when := "in queue order"
+	if in.Priority {
+		when = "before the other queued stories"
+	}
+	return fmt.Sprintf("story #%d added to spec #%d: it starts %s", number, in.Number, when), nil
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {

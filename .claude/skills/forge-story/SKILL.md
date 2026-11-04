@@ -39,4 +39,4 @@ Get the label ids (`api GET "/repos/$repo/labels"`). If `priority` is missing, t
 
 ## 3. Hand over
 
-Give the story link. It starts on the next poll once a slot is free and its `Depends on` issues are closed. Its agents comment on it as they go, the forge UI (http://localhost:8000) and `forge-status` show progress, and `forge-unblock` handles it if it gets blocked.
+Give the story link, and mention that the forge UI's "Add a story" form on each spec card does the same without the checks above. It starts on the next poll once a slot is free and its `Depends on` issues are closed. Its agents comment on it as they go, the forge UI (http://localhost:8000) and `forge-status` show progress, and `forge-unblock` handles it if it gets blocked.
