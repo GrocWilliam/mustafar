@@ -13,7 +13,7 @@ API calls go through `./forge-api.sh METHOD PATH [JSON | @file]` (prints the bod
 
 ## 1. Find out why
 
-Read the issue and all its comments (`./forge-api.sh GET "/repos/$repo/issues/$n"` and `.../comments`): the last `⛔ Blocked:` comment gives the reason, the `🤖 Agent` summaries and `🔁 Attempt` feedback show the history. Open the PR and CI run if they matter (`http://gitea:3000/$repo/pulls`, `.../actions`). Then classify:
+Read the issue and all its comments (`./forge-api.sh GET "/repos/$repo/issues/$n"` and `.../comments`): the last `⛔ Blocked:` comment gives the reason, the `🤖 Agent` summaries and `🔁 Attempt` feedback show the history. Open the PR and CI run if they matter (`http://localhost:3000/$repo/pulls`, `.../actions`). Then classify:
 
 | Reason says | Usually means | Fix |
 |---|---|---|

@@ -13,7 +13,7 @@ API calls go through `./forge-api.sh METHOD PATH [JSON | @file]` (prints the bod
 
 ## 1. Write the story
 
-Read the project first (`git clone http://gitea:3000/$repo.git` into the scratchpad): its `CLAUDE.md`, the code the story touches, and `tests/acceptance/`. Nobody answers the agents' questions, so the story stands on its own:
+Read the project first (`git clone http://localhost:3000/$repo.git` into the scratchpad): its `CLAUDE.md`, the code the story touches, and `tests/acceptance/`. Nobody answers the agents' questions, so the story stands on its own:
 
 - **Behavior, then `Acceptance criteria:`** followed by a `-` list a test can check: requests and exact responses, error messages, what the page shows (`data-testid`). Name the interfaces (file, function, endpoint) in the terms the code already uses. One dev session of about 30 turns: split anything bigger into stories linked by `Depends on`.
 - **Frozen tests**: only the tester may change existing acceptance tests, and the dev is rejected if it touches them. When the change breaks one, for example a test comparing the whole JSON of an object that gains a field, name the file and the edit the tester makes, and add "The dev never edits them."

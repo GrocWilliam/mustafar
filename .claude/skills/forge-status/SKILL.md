@@ -34,4 +34,4 @@ API calls go through `./forge-api.sh METHOD PATH [JSON | @file]` (prints the bod
 
 ## Report
 
-One short block per project: counts per label, what runs now, each blocked issue with its one-line reason and link (`http://gitea:3000/$repo/issues/$n`), specs with `done/total` stories and spend. Then drift, one line per project that has any (in sync projects are not listed), then service problems, if any. For a blocked issue, offer the `forge-unblock` skill; don't fix it here.
+One short block per project: counts per label, what runs now, each blocked issue with its one-line reason and link (`http://localhost:3000/$repo/issues/$n`), specs with `done/total` stories and spend. Then drift, one line per project that has any (in sync projects are not listed), then service problems, if any. For a blocked issue, offer the `forge-unblock` skill; don't fix it here.

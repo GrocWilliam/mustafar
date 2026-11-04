@@ -40,6 +40,7 @@ services:
   # Gitea Actions runner: runs the target repo's CI in throwaway containers on the forge network.
   runner:
     image: gitea/act_runner:0.6.1
+    restart: unless-stopped # it exits when Gitea isn't up yet at boot: retry until it is
     environment:
       - CONFIG_FILE=/config.yaml
       - GITEA_INSTANCE_URL=http://gitea:3000

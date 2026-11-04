@@ -11,8 +11,8 @@ The README setup steps 1–3 and 5: Gitea, the `forge` admin, `.env` with the Cl
 
 ```bash
 ./new-project.sh shortener examples/url-shortener/spec.md
-# created http://gitea:3000/forge/shortener
-# spec opened: http://gitea:3000/forge/shortener/issues/1
+# created http://localhost:3000/forge/shortener
+# spec opened: http://localhost:3000/forge/shortener/issues/1
 ```
 
 The script creates the repo, adds the agents' deploy key and the CI workflow, then tags the repo with the `forge` topic.
@@ -79,7 +79,7 @@ On `VERDICT: approve` with green CI, the orchestrator takes the project's merge 
 `main` has the `Dockerfile` from #2, so the orchestrator builds it as `forge-app/forge/shortener:<sha>` and replaces the container `forge-staging-forge-shortener`, published on `localhost:<9000 + repo id>`:
 
 ```
-✅ CI green and review approved, pull request merged: http://gitea:3000/forge/shortener/pulls/2
+✅ CI green and review approved, pull request merged: http://localhost:3000/forge/shortener/pulls/2
 
 🚀 Deployed to staging (http://localhost:9002), `/health` answers 200.
 ```
@@ -95,7 +95,7 @@ curl -s -X POST localhost:9002/shorten -d '{"url": "https://example.com/a"}'
 # {"code": "aZ3k9Q", "short_url": "http://localhost:8080/aZ3k9Q"}
 curl -si localhost:9002/aZ3k9Q | grep -i location     # Location: https://example.com/a
 curl -s localhost:9002/stats/aZ3k9Q                    # {"url": "https://example.com/a", "hits": 1}
-git clone http://gitea:3000/forge/shortener.git        # the code, its tests, its history
+git clone http://localhost:3000/forge/shortener.git        # the code, its tests, its history
 ```
 
 (`short_url` says `localhost:8080`, the port inside the container, as the spec asked.)

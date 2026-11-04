@@ -22,7 +22,7 @@ name, number, hours, commit, spec = sys.argv[1], int(sys.argv[2]), float(sys.arg
 auth = "Basic " + base64.b64encode(b"forge:" + os.environ["FORGE_PASSWORD"].strip().encode()).decode()
 
 def api(path):
-    req = urllib.request.Request(f"http://gitea:3000/api/v1/repos/forge/{name}{path}", headers={"Authorization": auth})
+    req = urllib.request.Request(f"http://localhost:3000/api/v1/repos/forge/{name}{path}", headers={"Authorization": auth})
     with urllib.request.urlopen(req) as resp:
         return json.load(resp)
 
