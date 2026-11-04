@@ -59,7 +59,9 @@ Labels: `spec`, `us-todo`, `us-in-progress`, `us-review`, `us-blocked`. "Done" =
 - **Recovery**: on startup, the orchestrator removes the agent containers its previous run left (label `forge.agent`) and moves every `us-in-progress` US back to `us-todo` (no hourly timeout: a slow agent must not be duplicated).
 - `--max-turns 30` and a 45-minute timeout per agent run.
 - **Questions**: a spec too ambiguous to plan gets questions instead of stories (`{"questions": [...]}`): the spec goes to `us-blocked` with them, the human answers in its description and sets `spec` again.
-- **Guard hook**: `agents/guard.mjs`, a `PreToolUse` hook in the agent image, refuses during the run what the checks would reject after it: dev edits under `tests/acceptance/` or `PROTECTED_PATHS`, tester edits outside `tests/acceptance/`, any edit by the planner or reviewer, and git push, fetch, remote, rebase, switch or amend. It is a shortcut, not the authority: the post-run checks stay.
+- **Guard hook**: `agents/guard.mjs`, a `PreToolUse` hook in the agent image, refuses during the run what the checks would reject after it: dev edits under `tests/acceptance/` or `PROTECTED_PATHS`, tester edits outside `tests/acceptance/`, any edit by the planner or reviewer, git push, fetch, remote, rebase, switch or amend, and any written content holding a credential (the agent's own key by value, or a known token format). It is a shortcut, not the authority: the post-run checks stay.
+- **Stop check**: `agents/stop-check.sh`, a `Stop` hook, runs what CI runs (`make test`, `make build`, every acceptance `run.sh`) and checks nothing is left uncommitted when the dev finishes. A failure sends the dev back to work in the same session, at most twice per run; then CI and the retry feedback take over.
+- **Plan checks**: besides its JSON shape and dependencies, every story needs an `Acceptance criteria:` list, or the plan is rejected.
 - **Handoff**: each dev retry gets the previous run's final message, or its last steps when it was cut short, next to the feedback.
 
 ## Implementation requirements

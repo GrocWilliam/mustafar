@@ -7,6 +7,8 @@ COPY prompts /prompts
 COPY --chown=node:node skills /home/node/.claude/skills
 # The guard hook refuses, during the run, the edits the orchestrator rejects after it (frozen tests, protected paths, git pushes).
 COPY --chmod=755 guard.mjs /usr/local/bin/forge-guard.mjs
+# The stop check runs what CI runs before the dev finishes, so a failure is fixed in the same session.
+COPY --chmod=755 stop-check.sh /usr/local/bin/forge-stop-check.sh
 COPY --chown=node:node settings.json /home/node/.claude/settings.json
 # Claude Code refuses bypassPermissions as root.
 USER node

@@ -5,6 +5,11 @@
         "matcher": "Write|Edit|MultiEdit|NotebookEdit|Bash",
         "hooks": [{ "type": "command", "command": "node /usr/local/bin/forge-guard.mjs" }]
       }
+    ],
+    "Stop": [
+      {
+        "hooks": [{ "type": "command", "command": "bash /usr/local/bin/forge-stop-check.sh", "timeout": 1200 }]
+      }
     ]
   }
 }

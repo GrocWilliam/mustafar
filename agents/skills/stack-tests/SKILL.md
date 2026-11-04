@@ -25,10 +25,16 @@ projects). Copy the newest existing `run.sh` when there is one. It must:
    logging to a temp file; wait for `GET /health` = 200; print the log on failure; kill the server on exit.
 4. Run the tests and exit non-zero on failure.
 
+Each criterion gets its expected case, plus the failure and boundary cases the story states or clearly implies:
+invalid or missing input when the criterion names a validation (each rule, with the status and error it gives), the
+limits it names (max length, 0 and 1 items, the last page), and not-found or not-allowed when it names an owner or an
+id. Never test behavior the story does not imply: the dev cannot see your reasons, only your tests, and must not
+chase rules nobody asked for. Name these tests after the criterion too (`rejects an empty title`).
+
 Set up data through the public API, not the database. Browser tests:
 `createRequire(process.env.PLAYWRIGHT_DIR + '/')('playwright-core')` and
 `chromium.launch({ executablePath: process.env.CHROMIUM_PATH })`; never install browsers. Select by `data-testid`
-and roles, never by CSS classes (Tailwind classes change). One test per acceptance criterion, named after it; check
+and roles, never by CSS classes (Tailwind classes change). At least one test per acceptance criterion, named after it; check
 every language the app ships when the story shows text.
 
 ## Debugging

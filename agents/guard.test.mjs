@@ -46,4 +46,16 @@ yes('planner', 'Write', { file_path: '/w/notes.md' });
 no('reviewer', 'Write', { file_path: '/tmp/notes.md' });
 no('reviewer', 'Bash', { command: 'git diff origin/main...HEAD' });
 
+// secrets: real credential formats and the agent's own key, in any written content, anywhere
+const key = 'sk-ant-oat01-' + 'x'.repeat(40);
+const withKey = { ...env, CLAUDE_CODE_OAUTH_TOKEN: key };
+const secret = (args, e = env) => check({ tool_name: 'Write', tool_input: args, cwd: '/w' }, 'dev', e) !== null;
+assert.ok(secret({ file_path: '/w/src/a.ts', content: `const k = "${key}"` }, withKey));
+assert.ok(secret({ file_path: '/tmp/k.txt', content: 'AKIAABCDEFGHIJKLMNOP' }));
+assert.ok(secret({ file_path: '/w/a.pem', content: '-----BEGIN OPENSSH PRIVATE KEY-----\nabc' }));
+assert.ok(check({ tool_name: 'Edit', tool_input: { file_path: '/w/a.ts', new_string: 'ghp_' + 'a'.repeat(36) }, cwd: '/w' }, 'dev', env));
+assert.ok(check({ tool_name: 'MultiEdit', tool_input: { file_path: '/w/a.ts', edits: [{ new_string: 'xoxb-1234567890-abc' }] }, cwd: '/w' }, 'dev', env));
+assert.ok(!secret({ file_path: '/w/tests/unit/auth.test.ts', content: "login({ password: 'correct-horse-battery-staple', token: 'abc.def.ghi' })" }));
+assert.ok(!secret({ file_path: '/w/README.md', content: 'Set ANTHROPIC_API_KEY in .env' }, withKey));
+
 console.log('guard ok');

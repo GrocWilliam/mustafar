@@ -18,6 +18,29 @@ const GIT_FORBIDDEN = /\bgit\s+(?:-\S+\s+)*(push|fetch|remote|rebase|switch|filt
 // No cp or git checkout/restore: copying a test out, or restoring one as committed, is reading.
 const SHELL_WRITE = String.raw`(?:>>?\s*['"]?|\b(?:rm|mv|tee|truncate|touch|chmod)\b[^|;&]*|\bsed\s+-i[^|;&]*|\bperl\s+-\S*i[^|;&]*|\bgit\s+(?:rm|mv)\b[^|;&]*)`;
 
+// Formats real credentials have, precise enough to never match a test fixture's fake "password123".
+const SECRET_PATTERNS = [
+  ['an Anthropic API key', /sk-ant-[A-Za-z0-9_-]{20,}/],
+  ['an AWS access key', /\bAKIA[0-9A-Z]{16}\b/],
+  ['a GitHub token', /\b(?:gh[pousr]_[A-Za-z0-9]{36,}|github_pat_[A-Za-z0-9_]{40,})/],
+  ['a Slack token', /\bxox[baprs]-[A-Za-z0-9-]{10,}/],
+  ['a Google API key', /\bAIza[0-9A-Za-z_-]{35}/],
+  ['a private key', /-----BEGIN (?:RSA |EC |OPENSSH |DSA |PGP )?PRIVATE KEY-----/],
+];
+// The agent's own credentials, by exact value: AGENT.md lists an agent reading its key as an accepted risk, writing it out is not.
+const OWN_SECRETS = ['ANTHROPIC_API_KEY', 'CLAUDE_CODE_OAUTH_TOKEN'];
+
+/** Returns which secret the text holds, or null. */
+function secretIn(text, env) {
+  for (const name of OWN_SECRETS) {
+    if (env[name] && env[name].length >= 16 && text.includes(env[name])) return `the value of ${name}`;
+  }
+  for (const [what, pattern] of SECRET_PATTERNS) {
+    if (pattern.test(text)) return what;
+  }
+  return null;
+}
+
 const escape = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /** Path prefixes, relative to the repository root, the role must not write. */
@@ -39,7 +62,13 @@ export function check(event, role, env = process.env) {
   // POSIX paths: the agent runs on Linux, and the self-check must give the same answers on any host.
   const root = path.posix.resolve(event.cwd || process.cwd());
   if (WRITE_TOOLS.has(tool)) {
-    const paths = [args.file_path, args.notebook_path, ...(args.edits ?? []).map((e) => e?.file_path)].filter(Boolean);
+    const edits = args.edits ?? [];
+    const texts = [args.content, args.new_string, args.new_source, ...edits.map((e) => e?.new_string)].filter((t) => typeof t === 'string');
+    for (const text of texts) {
+      const secret = secretIn(text, env);
+      if (secret) return `the content holds ${secret}. Never write credentials to files: read them from environment variables.`;
+    }
+    const paths = [args.file_path, args.notebook_path, ...edits.map((e) => e?.file_path)].filter(Boolean);
     for (const p of paths) {
       const rel = path.posix.relative(root, path.posix.resolve(root, String(p)));
       if (rel.startsWith('../') || path.posix.isAbsolute(rel)) continue; // scratch files outside the repository are fine

@@ -5,7 +5,7 @@ The repository is cloned in the current directory, on its main branch. Below is 
 Rules:
 - Read the repository first: plan only what is missing, and build on what exists.
 - Each story is small enough for one dev session, delivers one testable behavior, and leaves the project working once merged.
-- Each story body describes the behavior, then lists acceptance criteria a test can check: inputs and expected outputs, commands and their output, requests and their responses. No vague criteria such as "fast" or "user-friendly".
+- Each story body describes the behavior, then lists, under an `Acceptance criteria:` line as a `-` list (the forge rejects a story without one), acceptance criteria a test can check: inputs and expected outputs, commands and their output, requests and their responses. No vague criteria such as "fast" or "user-friendly".
 - Name the interfaces precisely (module, function, command, endpoint) so the tester and the dev agree without talking.
 - `CLAUDE.md` is the project's memory: read it first. If it is still the forge's blank template, the first story also fills it in.
 - Default stack for a new web project, unless the spec or the existing code says otherwise: TypeScript, any framework that fits the spec, Tailwind CSS v4 for styles, Zod for validation, Drizzle ORM on PostgreSQL (PGlite when `DATABASE_URL` is unset) with drizzle-kit migrations, and all UI text in translation catalogs. The `stack-*` skills describe each; name these choices in the setup story so the tester and the dev agree.

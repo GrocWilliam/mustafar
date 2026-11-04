@@ -6,10 +6,15 @@ import (
 	"testing"
 )
 
+// criteria gives every fixture story a valid criteria list, so each bad plan fails for its own fault only.
+func criteria(plan string) string {
+	return strings.ReplaceAll(plan, `"body": "`, `"body": "Acceptance criteria:\n- it works\n`)
+}
+
 func TestParsePlan(t *testing.T) {
-	ok := "Here is the plan.\n```json\n" + `{"stories": [
+	ok := criteria("Here is the plan.\n```json\n" + `{"stories": [
 		{"key": "S1", "title": "Setup", "body": "Makefile", "depends_on": []},
-		{"key": "S2", "title": "Feature", "body": "Criteria", "depends_on": ["S1"]}]}` + "\n```"
+		{"key": "S2", "title": "Feature", "body": "Criteria", "depends_on": ["S1"]}]}` + "\n```")
 	stories, _, err := parsePlan(ok)
 	if err != nil || len(stories) != 2 || stories[1].DependsOn[0] != "S1" {
 		t.Fatalf("parsePlan = %+v, %v", stories, err)
@@ -34,8 +39,24 @@ func TestParsePlan(t *testing.T) {
 		"too many":              "```json\n{\"stories\": [" + strings.Repeat(`{"key": "x", "title": "x", "body": "x"},`, maxStories) + `{"key": "y", "title": "y", "body": "y"}]}` + "\n```",
 	}
 	for name, text := range bad {
-		if _, _, err := parsePlan(text); err == nil {
+		if _, _, err := parsePlan(criteria(text)); err == nil {
 			t.Errorf("%s: parsePlan accepted it", name)
+		}
+	}
+}
+
+func TestParsePlanCriteria(t *testing.T) {
+	plan := func(body string) string {
+		return "```json\n" + `{"stories": [{"key": "A", "title": "a", "body": "` + body + `"}]}` + "\n```"
+	}
+	for _, body := range []string{`Make it work.`, `Acceptance criteria:\n\nLater.`} {
+		if _, _, err := parsePlan(plan(body)); err == nil || !strings.Contains(err.Error(), "acceptance criteria") {
+			t.Errorf("%q: parsePlan = %v, want a missing criteria error", body, err)
+		}
+	}
+	for _, body := range []string{`**Acceptance criteria:**\n- prints Hello`, `Acceptance Criteria\n1. prints Hello`} {
+		if _, _, err := parsePlan(plan(body)); err != nil {
+			t.Errorf("%q: parsePlan = %v", body, err)
 		}
 	}
 }
