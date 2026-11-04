@@ -11,6 +11,8 @@ jobs:
   # Run from here, not from the dev's Makefile, so the dev cannot drop them from CI; in a job of its own, from a fresh
   # checkout, so `make test` cannot rewrite them on disk before they run.
   acceptance:
+    # No spaces: the job name becomes the container's network alias, and Podman's aardvark-dns stops on one with a space.
+    name: acceptance-${{ matrix.shard }}
     needs: test
     runs-on: ubuntu-latest
     strategy:
