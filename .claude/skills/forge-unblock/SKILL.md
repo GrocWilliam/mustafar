@@ -9,13 +9,11 @@ description: Diagnose a blocked forge issue (`us-blocked` story or spec) and ret
 
 Work from the forge root. Never print the admin password or `.env` values.
 
-```bash
-api() { curl -sf -X "$1" "http://gitea:3000/api/v1$2" -u "forge:$(cat secrets/gitea-admin-password)" -H 'Content-Type: application/json' ${3:+-d "$3"}; }
-```
+API calls go through `./forge-api.sh METHOD PATH [JSON | @file]` (prints the body, fails on an HTTP error).
 
 ## 1. Find out why
 
-Read the issue and all its comments (`api GET "/repos/$repo/issues/$n"` and `.../comments`): the last `⛔ Blocked:` comment gives the reason, the `🤖 Agent` summaries and `🔁 Attempt` feedback show the history. Open the PR and CI run if they matter (`http://gitea:3000/$repo/pulls`, `.../actions`). Then classify:
+Read the issue and all its comments (`./forge-api.sh GET "/repos/$repo/issues/$n"` and `.../comments`): the last `⛔ Blocked:` comment gives the reason, the `🤖 Agent` summaries and `🔁 Attempt` feedback show the history. Open the PR and CI run if they matter (`http://gitea:3000/$repo/pulls`, `.../actions`). Then classify:
 
 | Reason says | Usually means | Fix |
 |---|---|---|
@@ -28,14 +26,14 @@ Read the issue and all its comments (`api GET "/repos/$repo/issues/$n"` and `...
 
 ## 2. Fix
 
-- Edit a story or spec body: `api PATCH "/repos/$repo/issues/$n" '{"body": ...}'` (JSON built with `python3` so quotes and newlines survive). Keep the `---`, `Part of #` and `Depends on #` lines at the end of a story.
+- Edit a story or spec body: `./forge-api.sh PATCH "/repos/$repo/issues/$n" '{"body": ...}'` (JSON built with `python3` so quotes and newlines survive). Keep the `---`, `Part of #` and `Depends on #` lines at the end of a story.
 - Budget: for one spec, post a comment ending with `<!-- forge:budget=35.00 -->` on it (what the forge UI's budget form does; no restart). For every spec, change `MAX_COST_PER_SPEC` in `.env`, then `docker compose up -d orchestrator` (running stories go back to the queue).
 
 ## 3. Retry
 
-Get the label ids from `api GET "/repos/$repo/labels"`. Remove `us-blocked` (`api DELETE "/repos/$repo/issues/$n/labels/$BLOCKED_ID"`), then add the label to resume from (`api POST "/repos/$repo/issues/$n/labels" "{\"labels\": [$ID]}"`):
+Get the label ids from `./forge-api.sh GET "/repos/$repo/labels"`. Remove `us-blocked` (`./forge-api.sh DELETE "/repos/$repo/issues/$n/labels/$BLOCKED_ID"`), then add the label to resume from (`./forge-api.sh POST "/repos/$repo/issues/$n/labels" "{\"labels\": [$ID]}"`):
 
-- a story → `us-todo`: it resumes its branch `agent/us-<n>` when the dev had already worked on it (the tester is skipped and its tests stay frozen), otherwise it starts over from the tester. If CI had failed on the branch, the orchestrator merges `main` into it for a fresh CI run; when `main` has not moved there is nothing to merge, so a retry for a flaky CI failure goes straight to the dev with the old failure (rerun the job in the Gitea UI first, or let `main` move). Delete the branch to force a fresh start (`api DELETE "/repos/$repo/branches/agent%2Fus-$n"`), e.g. when the tests themselves were wrong;
+- a story → `us-todo`: it resumes its branch `agent/us-<n>` when the dev had already worked on it (the tester is skipped and its tests stay frozen), otherwise it starts over from the tester. If CI had failed on the branch, the orchestrator merges `main` into it for a fresh CI run; when `main` has not moved there is nothing to merge, so a retry for a flaky CI failure goes straight to the dev with the old failure (rerun the job in the Gitea UI first, or let `main` move). Delete the branch to force a fresh start (`./forge-api.sh DELETE "/repos/$repo/branches/agent%2Fus-$n"`), e.g. when the tests themselves were wrong;
 - a spec whose planning failed → `spec`: planned again (a failed plan's stories were closed);
 - a spec over budget → `spec-active`, then `us-todo` on each of its blocked stories.
 

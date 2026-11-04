@@ -9,9 +9,7 @@ A story is a Gitea issue labelled `us-todo`. Opening one starts paid agent runs 
 
 Work from the forge root. Never print the admin password or `.env` values.
 
-```bash
-api() { curl -sf -X "$1" "http://gitea:3000/api/v1$2" -u "forge:$(cat secrets/gitea-admin-password)" -H 'Content-Type: application/json' ${3:+-d "$3"}; }
-```
+API calls go through `./forge-api.sh METHOD PATH [JSON | @file]` (prints the body, fails on an HTTP error).
 
 ## 1. Write the story
 
@@ -33,9 +31,9 @@ Depends on #<n>      (only if it needs an open story merged first)
 
 ## 2. Open it
 
-Get the label ids (`api GET "/repos/$repo/labels"`). If `priority` is missing, the orchestrator predates it: redeploy with the `forge-setup` skill first, or open the story with `us-todo` only. Then create the issue, building the JSON with `python3` so quotes and newlines survive:
+Get the label ids (`./forge-api.sh GET "/repos/$repo/labels"`). If `priority` is missing, the orchestrator predates it: redeploy with the `forge-setup` skill first, or open the story with `us-todo` only. Then create the issue, building the JSON with `python3` so quotes and newlines survive:
 
-`api POST "/repos/$repo/issues" "{\"title\": ..., \"body\": ..., \"labels\": [US_TODO_ID, PRIORITY_ID]}"`
+`./forge-api.sh POST "/repos/$repo/issues" "{\"title\": ..., \"body\": ..., \"labels\": [US_TODO_ID, PRIORITY_ID]}"`
 
 ## 3. Hand over
 

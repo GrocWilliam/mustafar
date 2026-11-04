@@ -9,9 +9,7 @@ A spec is a Gitea issue labelled `spec` in a project (a repo with the `forge` to
 
 Work from the forge root. Never print the admin password or `.env` values.
 
-```bash
-api() { curl -sf -X "$1" "http://gitea:3000/api/v1$2" -u "forge:$(cat secrets/gitea-admin-password)" -H 'Content-Type: application/json' ${3:+-d "$3"}; }
-```
+API calls go through `./forge-api.sh METHOD PATH [JSON | @file]` (prints the body, fails on an HTTP error).
 
 ## 1. Write the spec
 
@@ -30,8 +28,8 @@ Ask the user only about real gaps (stack, a business rule); state the other choi
 
 - **New project** (repo name: lowercase, `[a-z0-9-]`): `./new-project.sh NAME /path/to/spec.md`. It creates the repo, deploy key, CI workflow and `forge` topic, waits for the orchestrator to create the labels, and opens the spec. Check first that the orchestrator runs (`curl -s localhost:8000/health`).
 - **After another spec**: end the body with a line `Depends on #N`; the orchestrator plans it only once #N is closed.
-- **Existing project** `owner/repo`: get the `spec` label id from `api GET "/repos/$repo/labels"`, then
-  `api POST "/repos/$repo/issues" "{\"title\": ..., \"body\": ..., \"labels\": [ID]}"`, building the JSON with `python3 -c 'import json,sys; ...'` so quotes and newlines survive.
+- **Existing project** `owner/repo`: get the `spec` label id from `./forge-api.sh GET "/repos/$repo/labels"`, then
+  `./forge-api.sh POST "/repos/$repo/issues" "{\"title\": ..., \"body\": ..., \"labels\": [ID]}"`, building the JSON with `python3 -c 'import json,sys; ...'` so quotes and newlines survive.
 
 ## 3. Hand over
 
