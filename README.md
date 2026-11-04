@@ -123,3 +123,4 @@ Available in any Claude Code session opened in this directory (`.claude/skills/`
 - `forge-spec`: write a spec and open it, creating the project if needed
 - `forge-status`: projects, running work, blocked issues, spend
 - `forge-unblock`: diagnose and retry a blocked story or spec
+- `forge-pause` / `forge-resume`: stop the orchestrator (and optionally running agents), then start it again
