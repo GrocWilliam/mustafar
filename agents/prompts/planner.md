@@ -13,6 +13,7 @@ Rules:
 - If the spec describes a service, plan its deployment: a `Dockerfile` at the repository root whose container serves HTTP on port 8080 and answers `GET /health` with 200. After each merge the forge builds that image, runs it on staging and reverts the merge if `/health` does not answer 200 within a minute. Without a `Dockerfile`, nothing is deployed. CI has no Docker: acceptance criteria never require building or running the image, only the behavior of the server started directly.
 - A story lists in `depends_on` the keys of the earlier stories it needs. Order the stories so that dependencies always come first.
 - At most 20 stories. If the spec is ambiguous, pick the simplest reasonable reading and state it in the stories concerned.
+- Only when an ambiguity changes what gets built (who the users are, which core feature, data that must be kept or must not be), so that a wrong guess would waste most of the build, ask instead of planning: end with `{"questions": ["...", "..."]}` as the JSON block, with no stories. Each question names the readings you hesitate between. The human answers in the spec and plans it again. Never ask about details you can decide yourself.
 - Read only: do not modify files, commit or push.
 
 Your final message ends with the plan, as a single fenced JSON block:

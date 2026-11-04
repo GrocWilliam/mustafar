@@ -30,41 +30,55 @@ var (
 )
 
 // parsePlan extracts the stories from the last ```json block of the planner's final message and validates them.
-func parsePlan(text string) ([]plannedStory, error) {
+// A planner that finds the spec too ambiguous to plan returns questions instead, for the human to answer in the spec.
+func parsePlan(text string) ([]plannedStory, []string, error) {
 	var plan struct {
-		Stories []plannedStory `json:"stories"`
+		Stories   []plannedStory `json:"stories"`
+		Questions []string       `json:"questions"`
 	}
 	// The JSON decoder finds where the value ends: story bodies may contain ``` fences, which a regex would stop at.
 	err := errors.New("no ```json block in the planner's final message")
 	for end := len(text); err != nil; {
 		start := strings.LastIndex(text[:end], "```json")
 		if start < 0 {
-			return nil, fmt.Errorf("plan JSON: %v", err)
+			return nil, nil, fmt.Errorf("plan JSON: %v", err)
 		}
-		plan.Stories = nil
+		plan.Stories, plan.Questions = nil, nil
 		err = json.NewDecoder(strings.NewReader(text[start+len("```json"):])).Decode(&plan)
 		end = start
 	}
+	var questions []string
+	for _, q := range plan.Questions {
+		if q = strings.TrimSpace(q); q != "" {
+			questions = append(questions, q)
+		}
+	}
+	if len(questions) > 0 {
+		if len(plan.Stories) > 0 {
+			return nil, nil, errors.New("the plan has both stories and questions: expected one or the other")
+		}
+		return nil, questions, nil
+	}
 	if n := len(plan.Stories); n == 0 || n > maxStories {
-		return nil, fmt.Errorf("the plan has %d stories, expected 1 to %d", n, maxStories)
+		return nil, nil, fmt.Errorf("the plan has %d stories, expected 1 to %d", n, maxStories)
 	}
 	seen := map[string]bool{}
 	for _, story := range plan.Stories {
 		if story.Key == "" || strings.TrimSpace(story.Title) == "" || strings.TrimSpace(story.Body) == "" {
-			return nil, fmt.Errorf("story %q lacks a key, a title or a body", story.Key)
+			return nil, nil, fmt.Errorf("story %q lacks a key, a title or a body", story.Key)
 		}
 		if seen[story.Key] {
-			return nil, fmt.Errorf("story key %q is used twice", story.Key)
+			return nil, nil, fmt.Errorf("story key %q is used twice", story.Key)
 		}
 		// Dependencies on earlier stories only: the list order is a valid build order, and there are no cycles.
 		for _, dep := range story.DependsOn {
 			if !seen[dep] {
-				return nil, fmt.Errorf("story %q depends on %q, which is not an earlier story", story.Key, dep)
+				return nil, nil, fmt.Errorf("story %q depends on %q, which is not an earlier story", story.Key, dep)
 			}
 		}
 		seen[story.Key] = true
 	}
-	return plan.Stories, nil
+	return plan.Stories, nil, nil
 }
 
 // refs returns the issue numbers captured by re in text.

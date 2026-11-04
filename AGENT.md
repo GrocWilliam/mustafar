@@ -58,6 +58,9 @@ Labels: `spec`, `us-todo`, `us-in-progress`, `us-review`, `us-blocked`. "Done" =
 - **Budget**: cumulative cost per spec (the `total_cost_usd` field of the `result` message); exceeding `MAX_COST_PER_SPEC` (or the spec's own `<!-- forge:budget=X -->` marker, set from the UI) → the spec and its remaining US go to `us-blocked`.
 - **Recovery**: on startup, the orchestrator removes the agent containers its previous run left (label `forge.agent`) and moves every `us-in-progress` US back to `us-todo` (no hourly timeout: a slow agent must not be duplicated).
 - `--max-turns 30` and a 45-minute timeout per agent run.
+- **Questions**: a spec too ambiguous to plan gets questions instead of stories (`{"questions": [...]}`): the spec goes to `us-blocked` with them, the human answers in its description and sets `spec` again.
+- **Guard hook**: `agents/guard.mjs`, a `PreToolUse` hook in the agent image, refuses during the run what the checks would reject after it: dev edits under `tests/acceptance/` or `PROTECTED_PATHS`, tester edits outside `tests/acceptance/`, any edit by the planner or reviewer, and git push, fetch, remote, rebase, switch or amend. It is a shortcut, not the authority: the post-run checks stay.
+- **Handoff**: each dev retry gets the previous run's final message, or its last steps when it was cut short, next to the feedback.
 
 ## Implementation requirements
 

@@ -156,6 +156,7 @@ func (o *project) runOnce(role string, is issue, feedback string) (bool, string,
 		"ISSUE_TITLE=" + is.Title,
 		"ISSUE_BODY=" + is.Body,
 		"FEEDBACK=" + feedback,
+		"PROTECTED_PATHS=" + strings.Join(o.cfg.Protected, ","), // for the guard hook (agents/guard.mjs)
 	}, o.cfg.ClaudeEnv...)
 	id, err := o.docker.run(o.cfg.AgentImage, o.cfg.AgentNetwork, env)
 	if id != "" {
@@ -214,7 +215,15 @@ func (o *project) runOnce(role string, is issue, feedback string) (bool, string,
 	if result != nil {
 		final = result.Result
 	}
-	return exitCode == 0, final, nil
+	return exitCode == 0, handoff(final, exitCode, steps), nil
+}
+
+// handoff is what a run leaves the next one: its final message or, for a run cut short without one, its last steps.
+func handoff(final string, exitCode int, steps []string) string {
+	if strings.TrimSpace(final) != "" || exitCode == 0 || len(steps) == 0 {
+		return final
+	}
+	return "(cut short, no final message) Its last steps were:\n- " + strings.Join(steps[max(0, len(steps)-maxSteps):], "\n- ")
 }
 
 // agentActivity is what an issue's agent does now, as the UI shows it.

@@ -15,9 +15,14 @@ func (o *project) planSpec(spec issue) error {
 	if err != nil || !ok {
 		return o.block(spec.Number, "spec", agentFailure("planner", err).Error())
 	}
-	stories, err := parsePlan(final)
+	stories, questions, err := parsePlan(final)
 	if err != nil {
 		return o.block(spec.Number, "spec", "invalid plan: "+err.Error())
+	}
+	if len(questions) > 0 {
+		// Cheaper to ask than to build every story on a wrong reading of the spec.
+		return o.block(spec.Number, "spec", "❓ the planner needs answers before it can plan this spec:\n\n- "+
+			strings.Join(questions, "\n- ")+"\n\nAnswer them in the spec's description: the planner reads only the description, not the comments.")
 	}
 
 	numbers := map[string]int{}

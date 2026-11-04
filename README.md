@@ -26,7 +26,7 @@ spec issue ──planner──▶ us-todo stories (with dependencies)
 
 ## Setup
 
-Requires Docker with Compose, `openssl`, `ssh-keygen`, and a Claude API key or subscription token.
+Requires Docker with Compose, `openssl`, `ssh-keygen`, `python3` (for `new-project.sh` and `bench.sh`), and a Claude API key or subscription token.
 
 ```bash
 # 1. Secrets, and one URL for Gitea everywhere (host, containers, CI jobs)
@@ -113,6 +113,7 @@ Once a project has a `Dockerfile` (the planner adds one when a spec describes a 
 - **Logs:** `docker compose logs -f orchestrator runner`
 - **Forge UI:** http://localhost:8000 shows projects, specs and stories with their pipeline step and live agent activity, and one tab per project, and has buttons to retry, set a spec's budget, open a spec, add a project, manage push mirrors and change the settings (localhost only).
 - **Status:** `curl localhost:8000/health` lists issues being worked on, as `owner/repo#n`.
+- **Benchmark:** `./bench.sh [SPEC_FILE]` builds a spec (default `examples/url-shortener/spec.md`) in a fresh `bench-*` project, waits until it is done or blocked, and appends spend, agent runs, retries and duration to `bench-results.tsv`, tagged with the forge commit. Run it before and after changing prompts or skills. It spends real money, like any spec.
 - **CI template change:** the orchestrator protects `main` against every push, so update each existing project's `.gitea/workflows/ci.yml` from `templates/ci.yml` through a PR merged in the web UI.
 
 ## Claude Code skills

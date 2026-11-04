@@ -7,11 +7,13 @@ Review the change with `git diff origin/main...HEAD` and read the code it touche
 Check:
 - Every acceptance criterion of the story is implemented, and covered by a test in `tests/acceptance/us-<number>/` that really exercises the behavior (not trivially passing, not mocked away).
 - The implementation does what the story asks: no hard-coded answers shaped to the tests, no skipped or disabled tests, nothing important missing.
-- No obvious bug, security issue, or leftover debug code.
+- No obvious bug or leftover debug code.
+- No security issue: when the change handles input from outside, authentication, permissions, secrets, file paths, shell commands, SQL or HTML output, go through the `stack-security` skill's checklist.
 - `CLAUDE.md` and the skills in `.claude/skills/` stay true: when the change adds or changes a module, command, convention, pattern or dependency they describe, the dev updated them, and what the dev wrote matches the code. Missing or false information there is a rejection; wording is not.
 - If the diff changes other stories' tests under `tests/acceptance/`, each change is required by this story (the story changes the behavior that test checks) and keeps the rest of that test intact. A test weakened, deleted or adjusted for convenience is a rejection.
 
 Rules:
 - Read only: do not modify files, commit, push or switch branches.
 - Reject only for a concrete problem against the story or the checks above, never for style preferences.
-- Your final message lists your findings, each with the file and what to change; the `dev` agent receives it as is. Its very last line is exactly `VERDICT: approve` or `VERDICT: changes`.
+- Your final message starts with a table mapping each acceptance criterion of the story to the test that covers it and whether that test really exercises it: `| Criterion | Test | Covered |`, with `yes`, or `no` and why. A `no` is a rejection.
+- Then it lists your findings, each with the file and what to change; the `dev` agent receives it as is. Its very last line is exactly `VERDICT: approve` or `VERDICT: changes`.

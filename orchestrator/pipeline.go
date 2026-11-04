@@ -69,17 +69,24 @@ func (o *project) deliver(is issue, label *string) error {
 // attempt runs one dev cycle and its checks (only the checks when skipDev). It returns the feedback for the next cycle, or "" once merged.
 // An error means the US cannot go on (infrastructure failure or misbehaving agent).
 func (o *project) attempt(is issue, branch string, baseTree, testerTree map[string]string, feedback string, label *string, skipDev bool) (string, error) {
+	// The next dev run starts a fresh session: what this one said it did and left undone spares it re-exploring.
+	summary := ""
+	retry := func(msg string) (string, error) {
+		if summary != "" {
+			msg += "\n\nYour previous run ended with:\n\n" + summary
+		}
+		return msg, nil
+	}
 	if skipDev {
 		// the branch head is the dev's earlier work: straight to the checks
 	} else if ok, final, err := o.runAgent("dev", is, feedback); err != nil {
 		return "", err
-	} else if !ok {
-		// Its own explanation (a contradiction in the tests, a missing tool...) beats a generic retry message.
-		msg := "Your previous run stopped before finishing (it failed, or produced no new commit). Whatever it had done is committed on the branch: continue from it, make the acceptance tests pass and commit your work."
-		if final = strings.TrimSpace(final); final != "" {
-			msg += "\n\nYour previous run ended with:\n\n" + clip(final, 3000)
+	} else {
+		summary = clip(strings.TrimSpace(final), 3000)
+		if !ok {
+			// Its own explanation (a contradiction in the tests, a missing tool...) beats a generic retry message.
+			return retry("Your previous run stopped before finishing (it failed, or produced no new commit). Whatever it had done is committed on the branch: continue from it, make the acceptance tests pass and commit your work.")
 		}
-		return msg, nil
 	}
 	pr, err := o.ensurePR(is, branch)
 	if err != nil {
@@ -112,11 +119,11 @@ func (o *project) attempt(is issue, branch string, baseTree, testerTree map[stri
 		return "", err
 	}
 	if touched := frozen(baseTree, testerTree, mainTree, headTree); len(touched) > 0 {
-		return "You modified frozen acceptance tests: " + list(touched) + ". Restore them exactly as committed by the tester and make the code pass them instead.", nil
+		return retry("You modified frozen acceptance tests: " + list(touched) + ". Restore them exactly as committed by the tester and make the code pass them instead.")
 	}
 	for _, prefix := range o.cfg.Protected {
 		if touched := drifted(headTree, prefix, baseTree, mainTree); len(touched) > 0 {
-			return "You modified protected paths: " + list(touched) + ". Revert these changes.", nil
+			return retry("You modified protected paths: " + list(touched) + ". Revert these changes.")
 		}
 	}
 	state, err := o.waitCI(head)
@@ -124,7 +131,7 @@ func (o *project) attempt(is issue, branch string, baseTree, testerTree map[stri
 		return "", err
 	}
 	if state != "success" {
-		return fmt.Sprintf("CI is `%s` on your last commit (%s): `make test` or an acceptance test `run.sh` fails. Reproduce and fix.", state, pr.HTMLURL) + o.ciLog(head), nil
+		return retry(fmt.Sprintf("CI is `%s` on your last commit (%s): `make test` or an acceptance test `run.sh` fails. Reproduce and fix.", state, pr.HTMLURL) + o.ciLog(head))
 	}
 
 	ok, review, err := o.runAgent("reviewer", is, "")
@@ -138,7 +145,7 @@ func (o *project) attempt(is issue, branch string, baseTree, testerTree map[stri
 		return "", errors.New("the reviewer pushed to the branch, which it must never do")
 	}
 	if approved, notes := verdict(review); !approved {
-		return "The reviewer requested changes:\n\n" + notes, nil
+		return retry("The reviewer requested changes:\n\n" + notes)
 	}
 
 	return o.land(is, pr, branch, head)

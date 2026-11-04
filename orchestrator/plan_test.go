@@ -10,7 +10,7 @@ func TestParsePlan(t *testing.T) {
 	ok := "Here is the plan.\n```json\n" + `{"stories": [
 		{"key": "S1", "title": "Setup", "body": "Makefile", "depends_on": []},
 		{"key": "S2", "title": "Feature", "body": "Criteria", "depends_on": ["S1"]}]}` + "\n```"
-	stories, err := parsePlan(ok)
+	stories, _, err := parsePlan(ok)
 	if err != nil || len(stories) != 2 || stories[1].DependsOn[0] != "S1" {
 		t.Fatalf("parsePlan = %+v, %v", stories, err)
 	}
@@ -18,23 +18,33 @@ func TestParsePlan(t *testing.T) {
 	// Fences inside story bodies, and an earlier ```json mention in the prose, must not break parsing.
 	fenced := "I'll answer with a ```json block.\n```json\n" + `{"stories": [
 		{"key": "S1", "title": "CLI", "body": "Run:\n` + "```bash\\npython3 -m greeter\\n```" + `\nAcceptance criteria:\n- prints Hello", "depends_on": []}]}` + "\n```\n"
-	if stories, err := parsePlan(fenced); err != nil || len(stories) != 1 || !strings.Contains(stories[0].Body, "```bash") {
+	if stories, _, err := parsePlan(fenced); err != nil || len(stories) != 1 || !strings.Contains(stories[0].Body, "```bash") {
 		t.Fatalf("fenced plan = %+v, %v", stories, err)
 	}
 
 	bad := map[string]string{
-		"no block":          "no plan here",
-		"invalid json":      "```json\n{nope}\n```",
-		"empty":             "```json\n{\"stories\": []}\n```",
-		"forward reference": "```json\n" + `{"stories": [{"key": "A", "title": "a", "body": "a", "depends_on": ["B"]}, {"key": "B", "title": "b", "body": "b"}]}` + "\n```",
-		"duplicate key":     "```json\n" + `{"stories": [{"key": "A", "title": "a", "body": "a"}, {"key": "A", "title": "b", "body": "b"}]}` + "\n```",
-		"missing title":     "```json\n" + `{"stories": [{"key": "A", "title": " ", "body": "a"}]}` + "\n```",
-		"too many":          "```json\n{\"stories\": [" + strings.Repeat(`{"key": "x", "title": "x", "body": "x"},`, maxStories) + `{"key": "y", "title": "y", "body": "y"}]}` + "\n```",
+		"no block":              "no plan here",
+		"invalid json":          "```json\n{nope}\n```",
+		"empty":                 "```json\n{\"stories\": []}\n```",
+		"forward reference":     "```json\n" + `{"stories": [{"key": "A", "title": "a", "body": "a", "depends_on": ["B"]}, {"key": "B", "title": "b", "body": "b"}]}` + "\n```",
+		"duplicate key":         "```json\n" + `{"stories": [{"key": "A", "title": "a", "body": "a"}, {"key": "A", "title": "b", "body": "b"}]}` + "\n```",
+		"missing title":         "```json\n" + `{"stories": [{"key": "A", "title": " ", "body": "a"}]}` + "\n```",
+		"stories and questions": "```json\n" + `{"stories": [{"key": "A", "title": "a", "body": "a"}], "questions": ["Which?"]}` + "\n```",
+		"blank questions":       "```json\n{\"questions\": [\" \"]}\n```",
+		"too many":              "```json\n{\"stories\": [" + strings.Repeat(`{"key": "x", "title": "x", "body": "x"},`, maxStories) + `{"key": "y", "title": "y", "body": "y"}]}` + "\n```",
 	}
 	for name, text := range bad {
-		if _, err := parsePlan(text); err == nil {
+		if _, _, err := parsePlan(text); err == nil {
 			t.Errorf("%s: parsePlan accepted it", name)
 		}
+	}
+}
+
+func TestParsePlanQuestions(t *testing.T) {
+	text := "The spec is ambiguous.\n```json\n" + `{"questions": ["Public, or logged-in users only?", " "]}` + "\n```"
+	stories, questions, err := parsePlan(text)
+	if err != nil || stories != nil || !reflect.DeepEqual(questions, []string{"Public, or logged-in users only?"}) {
+		t.Fatalf("parsePlan = %+v, %q, %v", stories, questions, err)
 	}
 }
 

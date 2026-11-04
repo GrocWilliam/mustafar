@@ -99,3 +99,16 @@ func TestLimitReset(t *testing.T) {
 		}
 	}
 }
+
+func TestHandoff(t *testing.T) {
+	steps := []string{"`Read` src/app.ts", "`Bash` make test"}
+	if got := handoff("Done: added X.", 1, steps); got != "Done: added X." {
+		t.Errorf("a final message is kept: %q", got)
+	}
+	if got := handoff("", 0, steps); got != "" {
+		t.Errorf("a successful run needs no handoff: %q", got)
+	}
+	if got := handoff(" ", 124, steps); !strings.Contains(got, "cut short") || !strings.HasSuffix(got, "- `Bash` make test") {
+		t.Errorf("a run cut short hands off its last steps: %q", got)
+	}
+}

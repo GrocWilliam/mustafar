@@ -26,10 +26,10 @@ The four agent roles:
 
 | Role | Reads | Produces |
 | --- | --- | --- |
-| `planner` | The spec | A plan: 1 to 20 stories, with acceptance criteria and build order |
+| `planner` | The spec | A plan: 1 to 20 stories, with acceptance criteria and build order. Or, for a spec too ambiguous to plan, questions to answer in the spec |
 | `tester` | A story | Failing acceptance tests in `tests/acceptance/us-<n>/` |
 | `dev` | The story and its tests | Code that makes the tests pass. It may not touch the tests. |
-| `reviewer` | Spec, story and diff | `VERDICT: approve` or `VERDICT: changes`, with notes |
+| `reviewer` | Spec, story and diff | A criterion → test table, then `VERDICT: approve` or `VERDICT: changes`, with notes |
 
 The labels:
 
