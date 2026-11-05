@@ -28,6 +28,7 @@ The four agent roles:
 | --- | --- | --- |
 | `planner` | The spec | A plan: 1 to 20 stories, with acceptance criteria and build order. Or, for a spec too ambiguous to plan, questions to answer in the spec |
 | `tester` | A story | Failing acceptance tests in `tests/acceptance/us-<n>/` |
+| `retester` | A story whose dev reported a `TEST CONFLICT:` (once per story) | Revised acceptance tests, or its reasons for keeping them |
 | `dev` | The story and its tests | Code that makes the tests pass. It may not touch the tests. |
 | `reviewer` | Spec, story and diff | A criterion → test table, then `VERDICT: approve` or `VERDICT: changes`, with notes |
 
@@ -100,7 +101,7 @@ The forge stops itself rather than loop or spend without limit; `us-blocked` is 
 | Safeguard | Rule | When it trips |
 | --- | --- | --- |
 | Retries | 3 dev attempts per story, each with the reason for the last rejection | Story → `us-blocked` |
-| Frozen tests | The dev may not change the tester's acceptance tests | Attempt rejected |
+| Frozen tests | The dev may not change the tester's acceptance tests; it reports a test that cannot pass with a `TEST CONFLICT:` line, and the tester revises it once | Attempt rejected |
 | Protected paths | No pull request may touch `PROTECTED_PATHS` (default `.gitea/`) | Attempt rejected |
 | Review | Only an explicit `VERDICT: approve` counts; the reviewer may not push | Attempt rejected, or story blocked if it pushed |
 | Budget | Agent cost per spec, retries included, capped by `MAX_COST_PER_SPEC` (default $20) | Spec and its waiting stories → `us-blocked` |

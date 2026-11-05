@@ -27,7 +27,7 @@ no('dev', 'Bash', { command: 'rm -rf node_modules && bash tests/acceptance/us-3/
 no('dev', 'Bash', { command: 'git checkout -- tests/acceptance/us-3/run.sh' });
 
 // every role: no pushing, fetching, rewriting
-for (const role of ['dev', 'tester', 'reviewer']) {
+for (const role of ['dev', 'tester', 'retester', 'reviewer']) {
   yes(role, 'Bash', { command: 'git push origin HEAD' });
   yes(role, 'Bash', { command: 'git fetch' });
   yes(role, 'Bash', { command: 'git commit --amend -m x' });
@@ -39,6 +39,8 @@ no('dev', 'Bash', { command: "git commit -m 'feat: x'" });
 // tester: only under tests/acceptance/
 no('tester', 'Write', { file_path: '/w/tests/acceptance/us-3/run.sh' });
 yes('tester', 'Edit', { file_path: '/w/src/app.ts' });
+no('retester', 'Edit', { file_path: '/w/tests/acceptance/us-50/inventory.test.mjs' });
+yes('retester', 'Edit', { file_path: '/w/src/app.ts' });
 
 // planner and reviewer: read only in the repository
 yes('reviewer', 'Edit', { file_path: '/w/src/app.ts' });

@@ -73,7 +73,7 @@ export function check(event, role, env = process.env) {
       const rel = path.posix.relative(root, path.posix.resolve(root, String(p)));
       if (rel.startsWith('../') || path.posix.isAbsolute(rel)) continue; // scratch files outside the repository are fine
       if (role === 'planner' || role === 'reviewer') return `the ${role} only reads: do not modify ${rel}.`;
-      if (role === 'tester' && !rel.startsWith(ACCEPTANCE)) return `the tester writes only under ${ACCEPTANCE}: ${rel} is outside it.`;
+      if ((role === 'tester' || role === 'retester') && !rel.startsWith(ACCEPTANCE)) return `the ${role} writes only under ${ACCEPTANCE}: ${rel} is outside it.`;
       for (const prefix of protectedPaths(role, env)) {
         if (rel.startsWith(prefix)) return frozenReason(rel, prefix);
       }

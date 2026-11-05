@@ -66,7 +66,8 @@ if [ "$(git rev-parse HEAD)" = "$start" ]; then
   echo "agent produced no commit" >&2
   [ "$status" -ne 0 ] && exit "$status"
   # A dev with nothing to add (a tests-only story the tester already did) goes on: CI and the reviewer judge the branch.
-  [ "$ROLE" = dev ] && exit 0
+  # A retester that rejects every reported conflict changes nothing, on purpose.
+  [ "$ROLE" = dev ] || [ "$ROLE" = retester ] && exit 0
   exit 3
 fi
 write_key

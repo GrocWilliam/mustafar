@@ -11,7 +11,7 @@ A local, **autonomous** software forge: I write a spec, headless Claude Code age
 - **gitea** — forge, work queue and source of truth (issues, labels, PRs, history). Ports 3000 (web), 2222 (SSH).
 - **act_runner** — Gitea Actions: CI (tests) only, without the Docker socket. Deterministic, no LLM.
 - **orchestrator** — Go, standard library only (Gitea and Docker Engine APIs over plain HTTP), port 8000. The only process that changes labels. Dispatches tasks to agents, applies merge rules, manages retries and budgets, deploys to staging and reverts.
-- **agent** — one-shot container (Node 26 + `@anthropic-ai/claude-code` + git), one role per run: `planner`, `tester`, `dev`, `reviewer`.
+- **agent** — one-shot container (Node 26 + `@anthropic-ai/claude-code` + git), one role per run: `planner`, `tester`, `dev`, `reviewer`, `retester`.
 - **staging** — one container per project, `forge-staging-<owner>-<repo>`, built from its `Dockerfile` after each merge, on `localhost:<9000 + repo id>` (the app listens on 8080 inside).
 - **projects** — every repository tagged with the `forge` topic that the orchestrator's token sees, discovered on each poll (`./new-project.sh` creates one). Agent slots (`MAX_AGENTS`) are shared by all projects; merges are serialized per project.
 
@@ -36,6 +36,7 @@ flowchart LR
 |---|---|---|
 | `planner` | `spec` issue | child US issues: verifiable acceptance criteria, `Depends on #N`, link to the spec |
 | `tester` | US | branch `agent/us-{n}` with acceptance tests in `tests/acceptance/us-{n}/` (failing), plus updates to earlier stories' tests this story supersedes |
+| `retester` | US, once, when the dev ends with a `TEST CONFLICT:` line | revised tests under `tests/acceptance/` (or none, with its reasons), which the dev must then pass |
 | `dev` | US + branch | code that makes the tests pass; **forbidden to modify `tests/acceptance/`** |
 | `reviewer` | spec + US + PR diff | verdict `approve` / `changes` + comment; checks every acceptance criterion |
 
@@ -99,6 +100,7 @@ Decisions so far:
 - Budget: each agent summary comment carries a hidden cost marker, so the spending of a spec (planner + all runs of all its stories, retries included) is read back from Gitea and survives restarts. Before starting a story, a spec over `MAX_COST_PER_SPEC` (default $20) is blocked with its waiting stories. Stories already running finish, so a spec can overshoot by up to `MAX_AGENTS` stories.
 - `handle()` drives a US through the whole pipeline in one goroutine (`pipeline.go`): `tester` → up to 3 × (`dev` → checks → CI → `reviewer`) → squash merge + close. Attempts and feedback live in memory; on restart, `us-in-progress` and `us-review` US go back to `us-todo`. A US whose branch has dev work after the tester's commits resumes it, skipping the tester and keeping its tests frozen (`resume.go`); if CI had failed on that branch, `main` is merged into it first so CI runs again (Gitea never reruns an unchanged commit), and when `main` has not moved the dev gets the failure. Otherwise it starts over. Deleting the branch forces a fresh start.
 - The `tester` force-pushes a fresh `agent/us-{n}` from `main`; `dev` and `reviewer` check that branch out; only `dev` pushes after it, never forced.
+- Test conflicts: a dev that ends its summary with `TEST CONFLICT: <file>: <change>` lines gets the `retester` once per story, on the same branch, before the checks. It may change only `tests/acceptance/` (guard hook and tree check), pushes without force, and its commit (author `forge-agent-retester`) becomes the tree the frozen check holds the dev to; a resume finds it again. If it keeps the tests, the dev gets its reasons as feedback. The reviewer judges its edits like the tester's.
 - Deterministic checks, comparing git trees through the Gitea API (`checks.go`):
   - the tester changed only `tests/acceptance/`, and wrote something in `tests/acceptance/us-{n}/`. It may update earlier stories' tests when this story changes the behavior they pin down (otherwise merged tests could never evolve: a story adding a language broke an earlier exact-output test). Such updates are announced in a 🧪 comment, and the reviewer must reject any that the story does not require;
   - the dev changed no acceptance test: every file the tester wrote or rewrote is identical to the tester's commit, and every other file under `tests/acceptance/` matches either the tester's commit or the current `main` (a merge of `main` brings in other stories' tests);
@@ -150,7 +152,7 @@ Decisions so far:
 └── agents/
     ├── Dockerfile            # forge-ci (the CI jobs' image, ci/Dockerfile) + claude-code
     ├── agent.sh              # clone, check out the US branch, run claude -p as $ROLE, push (ROLE=revert: git revert only)
-    └── prompts/              # planner.md, tester.md, dev.md, reviewer.md
+    └── prompts/              # planner.md, tester.md, dev.md, reviewer.md, retester.md
 ```
 
 ## Verification

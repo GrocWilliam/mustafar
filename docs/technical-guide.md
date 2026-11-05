@@ -39,7 +39,7 @@ The orchestrator is one Go binary, standard library only, that polls Gitea every
 | `project.go` | Per-repository setup (labels, `main` protection), dispatch, restart recovery, `block` |
 | `planner.go` | Runs the planner, creates stories, readiness by dependency, budget stop, spec closing |
 | `plan.go` | Pure parsing: the plan JSON, `Depends on` / `Part of` lines, plan and cost markers |
-| `pipeline.go` | One story from tester to merge: `deliver` and the dev `attempt` loop, `waitCI` |
+| `pipeline.go` | One story from tester to merge: `deliver`, the dev `attempt` loop, the tester's `revise` on a reported test conflict, `waitCI` |
 | `resume.go` | A retried story continues its branch when the dev had started, skipping the tester |
 | `checks.go` | Pure merge checks: reviewer verdict, frozen tests, protected paths |
 | `land.go` | Serialized merge: update the branch from `main`, rerun CI, squash-merge, deploy |

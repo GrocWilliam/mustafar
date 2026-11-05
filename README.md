@@ -21,7 +21,7 @@ spec issue ──planner──▶ us-todo stories (with dependencies)
 | `gitea` | Forge, work queue and source of truth. Web on `:3000`, SSH on `:2222`. |
 | `runner` | Gitea Actions runner: CI only (`make test` + `tests/acceptance/*/run.sh`). No LLM. |
 | `orchestrator` | Go service on `:8000`, which also serves the forge UI. The only thing that changes labels; dispatches agents, merges, deploys, reverts. |
-| `agent` | One-shot Claude Code container, one role per run: `planner`, `tester`, `dev`, `reviewer`. |
+| `agent` | One-shot Claude Code container, one role per run: `planner`, `tester`, `dev`, `reviewer`, `retester` (revises tests the dev reports as conflicting). |
 | staging | One container per project, `forge-staging-<owner>-<repo>`, on `localhost:<9000 + repo id>`. |
 
 ## Setup

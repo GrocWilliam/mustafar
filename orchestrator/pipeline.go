@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"regexp"
 	"slices"
 	"strings"
 	"time"
@@ -14,37 +15,27 @@ const (
 	acceptanceDir = "tests/acceptance/"
 )
 
+// contract is what a story's checks compare against: the tree the tester started from, and the tree holding its
+// tests (its last commit, or its revision). revised is set once the tester has revised them, which it does once.
+type contract struct {
+	base, tests map[string]string
+	revised     bool
+}
+
+// conflictLine is how the dev reports a test that cannot pass (agents/prompts/dev.md).
+var conflictLine = regexp.MustCompile(`(?m)^\W*TEST CONFLICT:`)
+
 // deliver takes a US from acceptance tests to merge: tester, then up to maxAttempts dev cycles.
 // Agents write code; only the checks here decide. label tracks the US's current label for block().
 // Attempts and feedback live in memory: a restart re-queues the US, which resumes its branch if the dev had started.
 func (o *project) deliver(is issue, label *string) error {
 	branch := fmt.Sprintf("agent/us-%d", is.Number)
-	baseTree, testerTree, resumed, err := o.resume(is, branch)
+	c, resumed, err := o.resume(is, branch)
 	if err != nil {
 		return err
 	}
 	if !resumed {
-		if baseTree, err = o.treeOf(o.base); err != nil {
-			return err
-		}
-		if ok, _, err := o.runAgent("tester", is, ""); err != nil || !ok {
-			return agentFailure("tester", err)
-		}
-		if testerTree, err = o.treeOf(branch); err != nil {
-			return err
-		}
-	}
-	ownDir := fmt.Sprintf("%sus-%d/", acceptanceDir, is.Number)
-	if stray := outside(changed(baseTree, testerTree, ""), acceptanceDir); len(stray) > 0 {
-		return fmt.Errorf("the tester changed files outside `%s`: %s", acceptanceDir, list(stray))
-	}
-	if len(changed(baseTree, testerTree, ownDir)) == 0 {
-		return fmt.Errorf("the tester wrote no acceptance tests in `%s`", ownDir)
-	}
-	// A story may change behavior that earlier stories' tests pin down: the tester updates those tests, visibly.
-	if earlier := outside(changed(baseTree, testerTree, acceptanceDir), ownDir); len(earlier) > 0 && !resumed {
-		msg := "🧪 This story supersedes earlier acceptance tests, which the tester updated: " + list(earlier) + ". The reviewer checks that the story requires it."
-		if _, err := o.gitea.comment(is.Number, msg); err != nil {
+		if err := o.test(is, branch, &c); err != nil {
 			return err
 		}
 	}
@@ -59,7 +50,7 @@ func (o *project) deliver(is issue, label *string) error {
 		}
 		// A resumed branch may already hold finished work (e.g. a restart between CI and review): check it before rerunning the dev.
 		skipDev := resumed && attempt == 1
-		if feedback, err = o.attempt(is, branch, baseTree, testerTree, feedback, label, skipDev); err != nil || feedback == "" {
+		if feedback, err = o.attempt(is, branch, &c, feedback, label, skipDev); err != nil || feedback == "" {
 			return err
 		}
 	}
@@ -68,7 +59,7 @@ func (o *project) deliver(is issue, label *string) error {
 
 // attempt runs one dev cycle and its checks (only the checks when skipDev). It returns the feedback for the next cycle, or "" once merged.
 // An error means the US cannot go on (infrastructure failure or misbehaving agent).
-func (o *project) attempt(is issue, branch string, baseTree, testerTree map[string]string, feedback string, label *string, skipDev bool) (string, error) {
+func (o *project) attempt(is issue, branch string, c *contract, feedback string, label *string, skipDev bool) (string, error) {
 	// The next dev run starts a fresh session: what this one said it did and left undone spares it re-exploring.
 	summary := ""
 	retry := func(msg string) (string, error) {
@@ -83,7 +74,13 @@ func (o *project) attempt(is issue, branch string, baseTree, testerTree map[stri
 		return "", err
 	} else {
 		summary = clip(strings.TrimSpace(final), 3000)
-		if !ok {
+		if conflictLine.MatchString(final) && !c.revised {
+			if rejected, err := o.revise(is, branch, c, conflictReport(final)); err != nil {
+				return "", err
+			} else if rejected != "" {
+				return rejected, nil
+			}
+		} else if !ok {
 			// Its own explanation (a contradiction in the tests, a missing tool...) beats a generic retry message.
 			return retry("Your previous run stopped before finishing (it failed, or produced no new commit). Whatever it had done is committed on the branch: continue from it, make the acceptance tests pass and commit your work.")
 		}
@@ -118,11 +115,11 @@ func (o *project) attempt(is issue, branch string, baseTree, testerTree map[stri
 	if err != nil {
 		return "", err
 	}
-	if touched := frozen(baseTree, testerTree, mainTree, headTree); len(touched) > 0 {
+	if touched := frozen(c.base, c.tests, mainTree, headTree); len(touched) > 0 {
 		return retry("You modified frozen acceptance tests: " + list(touched) + ". Restore them exactly as committed by the tester and make the code pass them instead.")
 	}
 	for _, prefix := range o.cfg.Protected {
-		if touched := drifted(headTree, prefix, baseTree, mainTree); len(touched) > 0 {
+		if touched := drifted(headTree, prefix, c.base, mainTree); len(touched) > 0 {
 			return retry("You modified protected paths: " + list(touched) + ". Revert these changes.")
 		}
 	}
@@ -149,6 +146,85 @@ func (o *project) attempt(is issue, branch string, baseTree, testerTree map[stri
 	}
 
 	return o.land(is, pr, branch, head)
+}
+
+// conflictReport puts the dev's `TEST CONFLICT:` lines first, where clipping its summary cannot cut them off.
+func conflictReport(final string) string {
+	var lines []string
+	for _, line := range strings.Split(final, "\n") {
+		if conflictLine.MatchString(line) {
+			lines = append(lines, strings.TrimSpace(line))
+		}
+	}
+	return strings.Join(lines, "\n") + "\n\nThe dev's summary:\n\n" + clip(strings.TrimSpace(final), 3000)
+}
+
+// test runs the tester on a fresh branch and checks what it committed. A resumed branch passed these checks when
+// its tester ran, and a revision may follow them since: its trees hold the dev's work too.
+func (o *project) test(is issue, branch string, c *contract) error {
+	var err error
+	if c.base, err = o.treeOf(o.base); err != nil {
+		return err
+	}
+	if ok, _, err := o.runAgent("tester", is, ""); err != nil || !ok {
+		return agentFailure("tester", err)
+	}
+	if c.tests, err = o.treeOf(branch); err != nil {
+		return err
+	}
+	ownDir := fmt.Sprintf("%sus-%d/", acceptanceDir, is.Number)
+	if stray := outside(changed(c.base, c.tests, ""), acceptanceDir); len(stray) > 0 {
+		return fmt.Errorf("the tester changed files outside `%s`: %s", acceptanceDir, list(stray))
+	}
+	if len(changed(c.base, c.tests, ownDir)) == 0 {
+		return fmt.Errorf("the tester wrote no acceptance tests in `%s`", ownDir)
+	}
+	// A story may change behavior that earlier stories' tests pin down: the tester updates those tests, visibly.
+	if earlier := outside(changed(c.base, c.tests, acceptanceDir), ownDir); len(earlier) > 0 {
+		msg := "🧪 This story supersedes earlier acceptance tests, which the tester updated: " + list(earlier) + ". The reviewer checks that the story requires it."
+		if _, err := o.gitea.comment(is.Number, msg); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// revise runs the tester again on the tests the dev reported as conflicting (report: the dev's summary). The checks
+// then hold the dev to the revised tests. It returns the dev's feedback when the revision cannot go ahead or the
+// tester kept the tests, "" to go on with the checks.
+func (o *project) revise(is issue, branch string, c *contract, report string) (string, error) {
+	before, err := o.treeOf(branch)
+	if err != nil {
+		return "", err
+	}
+	mainTree, err := o.treeOf(o.base)
+	if err != nil {
+		return "", err
+	}
+	// The revision would adopt the dev's own edits of the tests as the tester's.
+	if touched := frozen(c.base, c.tests, mainTree, before); len(touched) > 0 {
+		return "You modified frozen acceptance tests: " + list(touched) + ". Restore them exactly as committed by the tester; report a conflict with a `TEST CONFLICT:` line instead of editing the test.", nil
+	}
+	c.revised = true // once per story, whatever the tester decides
+	ok, final, err := o.runAgent("retester", is, report)
+	if err != nil || !ok {
+		return "", agentFailure("retester", err)
+	}
+	after, err := o.treeOf(branch)
+	if err != nil {
+		return "", err
+	}
+	if stray := outside(changed(before, after, ""), acceptanceDir); len(stray) > 0 {
+		return "", fmt.Errorf("the tester's revision changed files outside `%s`: %s", acceptanceDir, list(stray))
+	}
+	revised := changed(before, after, acceptanceDir)
+	if len(revised) == 0 {
+		return "The tester checked the test conflicts you reported and kept the tests: fix the code. Its answer:\n\n" + clip(strings.TrimSpace(final), 3000), nil
+	}
+	c.tests = after
+	msg := "🧪 The dev reported a test conflict: the tester revised " + list(revised) + ". The reviewer checks that the story requires it."
+	_, err = o.gitea.comment(is.Number, msg)
+	return "", err
 }
 
 // ensurePR returns the branch's pull request, opening it on the first attempt.

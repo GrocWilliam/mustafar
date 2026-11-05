@@ -2,6 +2,7 @@ package main
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -82,5 +83,17 @@ func TestVerdict(t *testing.T) {
 		if got, _ := verdict(c.review); got != c.want {
 			t.Errorf("verdict(%q) = %v, want %v", c.review, got, c.want)
 		}
+	}
+}
+
+func TestConflictReport(t *testing.T) {
+	final := "Done.\n\nTEST CONFLICT: tests/acceptance/us-50/a.mjs: selector too broad\n- **TEST CONFLICT:** us-4: SHAPE lacks domains\nNot a TEST CONFLICT: line"
+	got := conflictReport(final)
+	want := "TEST CONFLICT: tests/acceptance/us-50/a.mjs: selector too broad\n- **TEST CONFLICT:** us-4: SHAPE lacks domains\n\nThe dev's summary:"
+	if !strings.HasPrefix(got, want) {
+		t.Errorf("conflictReport = %q, want prefix %q", got, want)
+	}
+	if conflictLine.MatchString("I saw no TEST CONFLICT: here") {
+		t.Error("a mid-line mention must not count as a report")
 	}
 }
