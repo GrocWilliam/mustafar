@@ -55,7 +55,7 @@ func TestParsePlanCriteria(t *testing.T) {
 			t.Errorf("%q: parsePlan = %v, want a missing criteria error", body, err)
 		}
 	}
-	for _, body := range []string{`**Acceptance criteria:**\n- prints Hello`, `Acceptance Criteria\n1. prints Hello`} {
+	for _, body := range []string{`**Acceptance criteria:**\n- prints Hello`, `Acceptance Criteria\n1. prints Hello`, `Intro.\nAcceptance criteria (scenario page):\n- prints Hello`} {
 		if _, _, err := parsePlan(plan(body)); err != nil {
 			t.Errorf("%q: parsePlan = %v", body, err)
 		}

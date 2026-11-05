@@ -23,8 +23,9 @@ type plannedStory struct {
 var (
 	dependsLine = regexp.MustCompile(`(?mi)^depends on #(\d+)`)
 	partOfLine  = regexp.MustCompile(`(?mi)^part of #(\d+)`)
-	// A story's criteria: an "Acceptance criteria" line (any bold or colon) followed by a list item.
-	criteriaList = regexp.MustCompile(`(?i)acceptance criteria\W*\n\s*(?:[-*]|\d+[.)])\s+\S`)
+	// A story's criteria: a line starting with "Acceptance criteria" (any bold, colon or qualifier such as
+	// "(scenario page)") followed by a list item.
+	criteriaList = regexp.MustCompile(`(?im)^\W*acceptance criteria[^\n]*\n\s*(?:[-*]|\d+[.)])\s+\S`)
 	planMarker   = regexp.MustCompile(`<!-- forge:stories ([\d,]+) -->`)
 	costMarker   = regexp.MustCompile(`<!-- forge:cost=([\d.]+) -->`)
 	// budgetMarker on a spec comment overrides MAX_COST_PER_SPEC for that spec; the last one wins.
@@ -71,7 +72,8 @@ func parsePlan(text string) ([]plannedStory, []string, error) {
 		}
 		// Without criteria the tester invents them, and the story is done when its own guesses pass.
 		if !criteriaList.MatchString(story.Body) {
-			return nil, nil, fmt.Errorf("story %q has no acceptance criteria: an `Acceptance criteria:` line followed by a list", story.Key)
+			return nil, nil, fmt.Errorf("story %q has no acceptance criteria: an `Acceptance criteria:` line followed by a list. Its body ends with:\n\n```\n%s\n```",
+				story.Key, tail(story.Body, 800))
 		}
 		if seen[story.Key] {
 			return nil, nil, fmt.Errorf("story key %q is used twice", story.Key)
@@ -148,4 +150,12 @@ func specBudget(comments []string, fallback float64) float64 {
 
 func budgetMarkerFor(budget float64) string {
 	return fmt.Sprintf("<!-- forge:budget=%.2f -->", budget)
+}
+
+// tail keeps the last limit runes of text, where a story's criteria would be.
+func tail(text string, limit int) string {
+	if runes := []rune(text); len(runes) > limit {
+		return "…" + string(runes[len(runes)-limit+1:])
+	}
+	return text
 }
