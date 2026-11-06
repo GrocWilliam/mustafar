@@ -205,6 +205,7 @@ There is deliberately no timeout-based requeue: a slow agent must not be duplica
 | `MAX_AGENTS` | 1 in code, 2 in `.env.example` | Specs and stories worked on at once, all projects. Keep `runner/config.yaml` capacity at least 4 times as high: each commit runs 4 CI jobs. |
 | `MAX_COST_PER_SPEC` | 20 | USD per spec, as reported by Claude Code |
 | `PROTECTED_PATHS` | `.gitea/` | Comma-separated path prefixes a pull request must not touch |
+| `MODEL_LOW`, `MODEL_MEDIUM`, `MODEL_HIGH` | `haiku`, `sonnet`, `opus` | `--model` per story complexity. The planner rates each story (`"complexity"` in the plan JSON, missing or unknown means `medium`); the forge writes it as a `Complexity:` line in the story footer, the last one wins, so a human can override it. The planner itself runs on the high model. Editable in the UI settings. |
 | `GITEA_URL`, `GITEA_SSH_URL` | `http://gitea:3000`, `ssh://git@gitea:22/` | Inside the compose network |
 | `AGENT_IMAGE`, `AGENT_NETWORK` | `forge-agent`, `forge` | Agent image and network |
 | `DEPLOY_KEY_FILE` | `/run/secrets/deploy_key` | Private key mounted into the orchestrator |

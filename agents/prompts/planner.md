@@ -11,6 +11,7 @@ Rules:
 - Default stack for a new web project, unless the spec or the existing code says otherwise: TypeScript, any framework that fits the spec, Tailwind CSS v4 for styles, Zod for validation, Drizzle ORM on PostgreSQL (PGlite when `DATABASE_URL` is unset) with drizzle-kit migrations, and all UI text in translation catalogs. The `stack-*` skills describe each; name these choices in the setup story so the tester and the dev agree.
 - If the repository has no build or test setup for what the spec needs, the first story sets it up: CI runs `make test` and the acceptance tests in Debian bookworm with Node 26, Python 3, make, git and Chromium (`$CHROMIUM_PATH`, for browser tests with `playwright-core` and `executablePath: process.env.CHROMIUM_PATH`).
 - If the spec describes a service, plan its deployment: a `Dockerfile` at the repository root whose container serves HTTP on port 8080 and answers `GET /health` with 200. After each merge the forge builds that image, runs it on staging and reverts the merge if `/health` does not answer 200 within a minute. Without a `Dockerfile`, nothing is deployed. CI has no Docker: acceptance criteria never require building or running the image, only the behavior of the server started directly.
+- Rate each story's `complexity`, which picks the model its agents run on: `low` (a small model) for mechanical work with an obvious solution, such as a copy change, a config value or a field added to an existing form; `medium` for most stories, a feature that follows the patterns already in the code; `high` (the strongest, priciest model) only for stories that need real design judgment: a new architecture or data model, concurrency, security, a tricky algorithm, or a change spread over many modules.
 - A story lists in `depends_on` the keys of the earlier stories it needs. Order the stories so that dependencies always come first.
 - At most 20 stories. If the spec is ambiguous, pick the simplest reasonable reading and state it in the stories concerned.
 - Only when an ambiguity changes what gets built (who the users are, which core feature, data that must be kept or must not be), so that a wrong guess would waste most of the build, ask instead of planning: end with `{"questions": ["...", "..."]}` as the JSON block, with no stories. Each question names the readings you hesitate between. The human answers in the spec and plans it again. Never ask about details you can decide yourself.
@@ -20,7 +21,7 @@ Your final message ends with the plan, as a single fenced JSON block:
 
 ```json
 {"stories": [
-  {"key": "S1", "title": "Short imperative title", "body": "What to build and why.\n\nAcceptance criteria:\n- ...", "depends_on": []},
-  {"key": "S2", "title": "...", "body": "...", "depends_on": ["S1"]}
+  {"key": "S1", "title": "Short imperative title", "body": "What to build and why.\n\nAcceptance criteria:\n- ...", "depends_on": [], "complexity": "medium"},
+  {"key": "S2", "title": "...", "body": "...", "depends_on": ["S1"], "complexity": "low"}
 ]}
 ```

@@ -60,6 +60,9 @@ func loadConfig() (config, error) {
 	if c.Defaults.MaxCostPerSpec, err = strconv.ParseFloat(env("MAX_COST_PER_SPEC", "20"), 64); err != nil {
 		return c, fmt.Errorf("MAX_COST_PER_SPEC: %w", err)
 	}
+	c.Defaults.ModelLow = env("MODEL_LOW", "haiku")
+	c.Defaults.ModelMedium = env("MODEL_MEDIUM", "sonnet")
+	c.Defaults.ModelHigh = env("MODEL_HIGH", "opus")
 	if err := c.Defaults.validate(); err != nil {
 		return c, fmt.Errorf(".env: %w", err)
 	}

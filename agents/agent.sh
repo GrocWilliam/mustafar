@@ -45,7 +45,7 @@ case "$ROLE" in planner | reviewer) unset key ;; esac # read-only roles never pu
 
 # A stalled run must not hold an agent slot until the orchestrator restarts.
 status=0
-timeout 45m claude -p "$(cat /tmp/task.md)" --permission-mode bypassPermissions \
+timeout 45m claude -p "$(cat /tmp/task.md)" ${MODEL:+--model "$MODEL"} --permission-mode bypassPermissions \
   --output-format stream-json --max-turns 30 --verbose || status=$?
 
 # The planner and the reviewer only read: their output is their final message.

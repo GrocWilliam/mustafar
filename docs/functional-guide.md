@@ -18,7 +18,7 @@ Five ideas are enough to use the forge: projects hold specs, specs split into us
 | --- | --- |
 | Project | A Gitea repository tagged with the `forge` topic. The forge discovers it automatically on its next poll. |
 | Spec | An issue labelled `spec`: the feature you want, in plain words. You write it; agents never do. |
-| User story (US) | A child issue the planner creates from a spec, with verifiable acceptance criteria and its dependencies (`Depends on #N`). |
+| User story (US) | A child issue the planner creates from a spec, with verifiable acceptance criteria, its dependencies (`Depends on #N`) and its complexity (`Complexity: low`, `medium` or `high`), which picks the Claude model its agents run on (set in the UI settings). |
 | Agent | A one-shot Claude Code run in its own container, with one role. It starts, works on one issue, and disappears. |
 | Label | The issue's place in the lifecycle. Only the orchestrator changes labels, except when you unblock something. |
 

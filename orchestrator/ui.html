@@ -269,14 +269,19 @@ function settingsView() {
   const s = state.settings, d = state.defaults;
   const field = (name, label, value, def, attrs) => `<label>${label} <input type="number" name="${name}" value="${value}" ${attrs} required>
     <span class="meta">.env default: ${def}</span></label>`;
+  const model = (name, label, value, def) => `<label>${label} <input name="${name}" value="${esc(value)}" required maxlength="100" autocomplete="off"><span class="meta">.env default: ${esc(def)}</span></label>`;
   return `<section class="card"><h2 style="margin-top:0;font-size:16px">Forge settings</h2>
     <form class="grid-form" data-act="settings">
       ${field("maxAgents", "Agents at once, across all projects", s.maxAgents, d.maxAgents, 'min="1" max="20" step="1"')}
       ${field("maxCostPerSpec", "Default budget per spec ($)", s.maxCostPerSpec, money(d.maxCostPerSpec), 'min="1" max="1000" step="0.5"')}
       ${field("pollSeconds", "Poll Gitea every (seconds)", s.pollSeconds, d.pollSeconds + "s", 'min="1" max="3600" step="1"')}
+      ${model("modelLow", "Model for low-complexity stories", s.modelLow, d.modelLow)}
+      ${model("modelMedium", "Model for medium-complexity stories (and stories without a rating)", s.modelMedium, d.modelMedium)}
+      ${model("modelHigh", "Model for high-complexity stories and the planner", s.modelHigh, d.modelHigh)}
       <p class="meta">Applied at once and saved: they outlive a restart. Fewer agents never stops a running one. Keep the runner
         capacity (runner/config.yaml) at least 4 times the agents: each commit runs 4 CI jobs. A new default budget applies to every
-        spec without its own.</p>
+        spec without its own. The planner rates each story low, medium or high (a <code>Complexity:</code> line in the story, which
+        you can edit); a model id (claude-sonnet-5-5) or a Claude Code alias (sonnet) applies from the next agent run.</p>
       <div><button class="primary" type="submit">Save</button></div>
     </form></section>`;
 }
@@ -398,7 +403,8 @@ app.addEventListener("submit", async (e) => {
     if (ok) f.reset();
   } else if (f.dataset.act === "settings") {
     ok = await act("/api/settings", { maxAgents: Number(data.get("maxAgents")), maxCostPerSpec: Number(data.get("maxCostPerSpec")),
-      pollSeconds: Number(data.get("pollSeconds")) }, button);
+      pollSeconds: Number(data.get("pollSeconds")), modelLow: data.get("modelLow"), modelMedium: data.get("modelMedium"),
+      modelHigh: data.get("modelHigh") }, button);
   } else if (f.dataset.act === "project") {
     const mode = data.get("mode"), name = data.get("name");
     if (confirm(`${mode === "import" ? "Import" : mode === "adopt" ? "Adopt" : "Create"} ${name} as a forge project? Its default branch becomes protected.`)) {

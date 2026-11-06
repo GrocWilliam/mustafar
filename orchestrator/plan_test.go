@@ -14,11 +14,16 @@ func criteria(plan string) string {
 
 func TestParsePlan(t *testing.T) {
 	ok := criteria("Here is the plan.\n```json\n" + `{"stories": [
-		{"key": "S1", "title": "Setup", "body": "Makefile", "depends_on": []},
-		{"key": "S2", "title": "Feature", "body": "Criteria", "depends_on": ["S1"]}]}` + "\n```")
+		{"key": "S1", "title": "Setup", "body": "Makefile", "depends_on": [], "complexity": " High"},
+		{"key": "S2", "title": "Feature", "body": "Criteria", "depends_on": ["S1"]},
+		{"key": "S3", "title": "Copy", "body": "Text", "complexity": "low"}]}` + "\n```")
 	stories, _, err := parsePlan(ok)
-	if err != nil || len(stories) != 2 || stories[1].DependsOn[0] != "S1" {
+	if err != nil || len(stories) != 3 || stories[1].DependsOn[0] != "S1" {
 		t.Fatalf("parsePlan = %+v, %v", stories, err)
+	}
+	// An unrated story runs on the medium model rather than costing a new plan.
+	if got := []string{stories[0].Complexity, stories[1].Complexity, stories[2].Complexity}; !slices.Equal(got, []string{"high", "medium", "low"}) {
+		t.Fatalf("complexities = %v", got)
 	}
 
 	// Fences inside story bodies, and an earlier ```json mention in the prose, must not break parsing.
@@ -106,5 +111,19 @@ func TestByPriority(t *testing.T) {
 	}
 	if want := []int{5, 9, 3, 4}; !reflect.DeepEqual(got, want) {
 		t.Errorf("order = %v, want %v", got, want)
+	}
+}
+
+func TestComplexityModel(t *testing.T) {
+	s := settings{ModelLow: "haiku", ModelMedium: "sonnet", ModelHigh: "opus"}
+	for body, want := range map[string]string{
+		"Do it.\n\n---\nPart of #3\nComplexity: low":                          "haiku",
+		"Do it.\n---\nComplexity: low\ncomplexity: HIGH":                      "opus", // a human's later line wins
+		"Do it.\n\n---\nPart of #3":                                           "sonnet",
+		"The complexity: high of this is prose, not a footer.\nComplexity: x": "sonnet",
+	} {
+		if got := s.model(complexityOf(body)); got != want {
+			t.Errorf("%q: model %q, want %q", body, got, want)
+		}
 	}
 }

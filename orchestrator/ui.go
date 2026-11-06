@@ -339,7 +339,8 @@ func (f *forge) serveUI() {
 		if err := f.updateSettings(s); err != nil {
 			return "", err
 		}
-		return fmt.Sprintf("settings saved: %d agents, $%.2f per spec, poll every %ds", s.MaxAgents, s.MaxCostPerSpec, s.PollSeconds), nil
+		return fmt.Sprintf("settings saved: %d agents, $%.2f per spec, poll every %ds, models %s / %s / %s",
+			s.MaxAgents, s.MaxCostPerSpec, s.PollSeconds, s.ModelLow, s.ModelMedium, s.ModelHigh), nil
 	}))
 }
 

@@ -18,11 +18,15 @@ type plannedStory struct {
 	Title     string   `json:"title"`
 	Body      string   `json:"body"`
 	DependsOn []string `json:"depends_on"`
+	// Complexity picks the story's model (settings.model): low, medium or high.
+	Complexity string `json:"complexity"`
 }
 
 var (
 	dependsLine = regexp.MustCompile(`(?mi)^depends on #(\d+)`)
 	partOfLine  = regexp.MustCompile(`(?mi)^part of #(\d+)`)
+	// complexityLine is in a story's footer, where a human can change it; the last one wins.
+	complexityLine = regexp.MustCompile(`(?mi)^complexity:\s*(low|medium|high)\s*$`)
 	// A story's criteria: a line starting with "Acceptance criteria" (any bold, colon or qualifier such as
 	// "(scenario page)") followed by a list item.
 	criteriaList = regexp.MustCompile(`(?im)^\W*acceptance criteria[^\n]*\n\s*(?:[-*]|\d+[.)])\s+\S`)
@@ -66,7 +70,13 @@ func parsePlan(text string) ([]plannedStory, []string, error) {
 		return nil, nil, fmt.Errorf("the plan has %d stories, expected 1 to %d", n, maxStories)
 	}
 	seen := map[string]bool{}
-	for _, story := range plan.Stories {
+	for i, story := range plan.Stories {
+		// An unrated story is not worth a new planner run: it runs on the medium model.
+		if c := strings.ToLower(strings.TrimSpace(story.Complexity)); c == "low" || c == "high" {
+			plan.Stories[i].Complexity = c
+		} else {
+			plan.Stories[i].Complexity = "medium"
+		}
 		if story.Key == "" || strings.TrimSpace(story.Title) == "" || strings.TrimSpace(story.Body) == "" {
 			return nil, nil, fmt.Errorf("story %q lacks a key, a title or a body", story.Key)
 		}
@@ -87,6 +97,15 @@ func parsePlan(text string) ([]plannedStory, []string, error) {
 		seen[story.Key] = true
 	}
 	return plan.Stories, nil, nil
+}
+
+// complexityOf returns the complexity in a story's body, or "" when it has none.
+func complexityOf(body string) string {
+	matches := complexityLine.FindAllStringSubmatch(body, -1)
+	if len(matches) == 0 {
+		return ""
+	}
+	return strings.ToLower(matches[len(matches)-1][1])
 }
 
 // refs returns the issue numbers captured by re in text.

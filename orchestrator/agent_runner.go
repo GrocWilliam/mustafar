@@ -144,12 +144,15 @@ func (o *project) runOnce(role string, is issue, feedback string) (bool, string,
 	if err != nil {
 		return false, "", err
 	}
-	commentID, err := o.gitea.comment(is.Number, fmt.Sprintf("🤖 Agent `%s` picked up #%d", role, is.Number))
-	if err != nil {
-		return false, "", err
+	// Planning a whole spec is the hardest call: it gets the high model; a story's agents get the one its complexity names.
+	complexity := complexityOf(is.Body)
+	if role == "planner" {
+		complexity = "high"
 	}
+	model := o.settings().model(complexity)
 	env := append([]string{
 		"ROLE=" + role,
+		"MODEL=" + model,
 		"REPO_URL=" + o.sshURL,
 		"DEPLOY_KEY=" + string(key),
 		"ISSUE_NUMBER=" + strconv.Itoa(is.Number),
@@ -158,6 +161,10 @@ func (o *project) runOnce(role string, is issue, feedback string) (bool, string,
 		"FEEDBACK=" + feedback,
 		"PROTECTED_PATHS=" + strings.Join(o.cfg.Protected, ","), // for the guard hook (agents/guard.mjs)
 	}, o.cfg.ClaudeEnv...)
+	commentID, err := o.gitea.comment(is.Number, fmt.Sprintf("🤖 Agent `%s` picked up #%d on `%s`", role, is.Number, model))
+	if err != nil {
+		return false, "", err
+	}
 	id, err := o.docker.run(o.cfg.AgentImage, o.cfg.AgentNetwork, env)
 	if id != "" {
 		defer func() {

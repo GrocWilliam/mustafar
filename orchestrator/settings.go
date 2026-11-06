@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"time"
 )
 
@@ -17,6 +18,23 @@ type settings struct {
 	// MaxCostPerSpec stops a spec's remaining stories once its agents have cost more (USD, as reported by Claude Code).
 	MaxCostPerSpec float64 `json:"maxCostPerSpec"`
 	PollSeconds    int     `json:"pollSeconds"`
+	// The Claude model per story complexity, as the planner rates it: a model id or a Claude Code alias (haiku, sonnet, opus).
+	ModelLow    string `json:"modelLow"`
+	ModelMedium string `json:"modelMedium"`
+	ModelHigh   string `json:"modelHigh"`
+}
+
+var modelName = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:\[\]-]{0,99}$`)
+
+// model returns the model for a complexity; anything unrated runs on the medium one.
+func (s settings) model(complexity string) string {
+	switch complexity {
+	case "low":
+		return s.ModelLow
+	case "high":
+		return s.ModelHigh
+	}
+	return s.ModelMedium
 }
 
 func (s settings) validate() error {
@@ -27,6 +45,8 @@ func (s settings) validate() error {
 		return errors.New("the default budget must be between $0 and $1000")
 	case s.PollSeconds < 1 || s.PollSeconds > 3600: // below 1 s, the poll loop and waitCI would hammer Gitea
 		return errors.New("the poll interval must be between 1 and 3600 seconds")
+	case !modelName.MatchString(s.ModelLow) || !modelName.MatchString(s.ModelMedium) || !modelName.MatchString(s.ModelHigh):
+		return errors.New("each model must be a model id or alias such as claude-sonnet-5-5 or sonnet")
 	}
 	return nil
 }

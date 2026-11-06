@@ -25,7 +25,10 @@ End the body with these lines:
 ---
 Part of #<spec>
 Depends on #<n>      (only if it needs an open story merged first)
+Complexity: <low|medium|high>
 ```
+
+`Complexity` picks the agents' model (the forge's `MODEL_LOW`/`MEDIUM`/`HIGH` settings): `low` for mechanical work, `medium` (the default when missing) for most stories, `high` only for design-heavy work such as a new data model, concurrency or security.
 
 `Part of` is required: the forge UI, its retry button and the spend per spec treat an issue without it as a spec. Use the spec the story belongs to, otherwise the project's latest spec. Its cost counts toward that spec's budget, but the spec does not wait for the story before closing.
 

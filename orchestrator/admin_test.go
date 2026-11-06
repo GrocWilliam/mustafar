@@ -13,7 +13,7 @@ import (
 
 func TestSettingsSaveLoad(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "settings.json")
-	defaults := settings{MaxAgents: 2, MaxCostPerSpec: 20, PollSeconds: 30}
+	defaults := settings{MaxAgents: 2, MaxCostPerSpec: 20, PollSeconds: 30, ModelLow: "haiku", ModelMedium: "sonnet", ModelHigh: "opus"}
 	if s, err := loadSettings(path, defaults); err != nil || s != defaults {
 		t.Fatalf("no file: got %+v, %v; want the defaults", s, err)
 	}
@@ -24,7 +24,10 @@ func TestSettingsSaveLoad(t *testing.T) {
 	if f.settings() != defaults {
 		t.Fatal("a refused change was applied")
 	}
-	want := settings{MaxAgents: 4, MaxCostPerSpec: 7.5, PollSeconds: 10}
+	if err := f.updateSettings(settings{MaxAgents: 2, MaxCostPerSpec: 5, PollSeconds: 10, ModelLow: "haiku", ModelMedium: "sonnet; rm -rf /", ModelHigh: "opus"}); !errors.Is(err, errBadRequest) {
+		t.Fatalf("bad model: got %v, want a refusal", err)
+	}
+	want := settings{MaxAgents: 4, MaxCostPerSpec: 7.5, PollSeconds: 10, ModelLow: "claude-haiku-5-5", ModelMedium: "sonnet", ModelHigh: "opus[1m]"}
 	if err := f.updateSettings(want); err != nil {
 		t.Fatal(err)
 	}
@@ -32,7 +35,7 @@ func TestSettingsSaveLoad(t *testing.T) {
 		t.Fatalf("after save: got %+v, %v; want %+v", s, err, want)
 	}
 	os.WriteFile(path, []byte(`{"maxAgents": 3}`), 0o600)
-	if s, _ := loadSettings(path, defaults); s != (settings{MaxAgents: 3, MaxCostPerSpec: 20, PollSeconds: 30}) {
+	if s, _ := loadSettings(path, defaults); s != (settings{MaxAgents: 3, MaxCostPerSpec: 20, PollSeconds: 30, ModelLow: "haiku", ModelMedium: "sonnet", ModelHigh: "opus"}) {
 		t.Fatalf("partial file: got %+v, want the missing fields from the defaults", s)
 	}
 }

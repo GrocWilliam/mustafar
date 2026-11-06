@@ -30,7 +30,7 @@ func (o *project) planSpec(spec issue) error {
 	var created []int
 	var lines []string
 	for _, story := range stories {
-		body := fmt.Sprintf("%s\n\n---\nPart of #%d", strings.TrimSpace(story.Body), spec.Number)
+		body := fmt.Sprintf("%s\n\n---\nPart of #%d\nComplexity: %s", strings.TrimSpace(story.Body), spec.Number, story.Complexity)
 		var deps []string
 		for _, key := range story.DependsOn {
 			body += fmt.Sprintf("\nDepends on #%d", numbers[key])
@@ -43,7 +43,7 @@ func (o *project) planSpec(spec issue) error {
 		}
 		numbers[story.Key] = number
 		created = append(created, number)
-		line := fmt.Sprintf("- #%d %s", number, story.Title)
+		line := fmt.Sprintf("- #%d %s (%s)", number, story.Title, story.Complexity)
 		if len(deps) > 0 {
 			line += " (after " + strings.Join(deps, ", ") + ")"
 		}
