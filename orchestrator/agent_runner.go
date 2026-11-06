@@ -144,9 +144,9 @@ func (o *project) runOnce(role string, is issue, feedback string) (bool, string,
 	if err != nil {
 		return false, "", err
 	}
-	// Planning a whole spec is the hardest call: it gets the high model; a story's agents get the one its complexity names.
+	// Designing and planning a whole spec are the hardest calls: they get the high model; a story's agents get the one its complexity names.
 	complexity := complexityOf(is.Body)
-	if role == "planner" {
+	if role == "planner" || role == "architect" {
 		complexity = "high"
 	}
 	model := o.settings().model(complexity)

@@ -42,9 +42,11 @@ yes('tester', 'Edit', { file_path: '/w/src/app.ts' });
 no('retester', 'Edit', { file_path: '/w/tests/acceptance/us-50/inventory.test.mjs' });
 yes('retester', 'Edit', { file_path: '/w/src/app.ts' });
 
-// planner and reviewer: read only in the repository
+// planner, architect and reviewer: read only in the repository
 yes('reviewer', 'Edit', { file_path: '/w/src/app.ts' });
 yes('planner', 'Write', { file_path: '/w/notes.md' });
+yes('architect', 'Write', { file_path: '/w/docs/architecture.md' });
+no('architect', 'Write', { file_path: '/tmp/design.md' });
 no('reviewer', 'Write', { file_path: '/tmp/notes.md' });
 no('reviewer', 'Bash', { command: 'git diff origin/main...HEAD' });
 

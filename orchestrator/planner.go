@@ -7,12 +7,24 @@ import (
 	"strings"
 )
 
-// planSpec runs the planner on a `spec` issue and turns its plan into `us-todo` issues.
-// The planner only proposes: the orchestrator validates the plan and creates the issues itself.
+// planSpec runs the architect then the planner on a `spec` issue, and turns the plan into `us-todo` issues.
+// The agents only propose: the orchestrator validates the plan and creates the issues itself.
 func (o *project) planSpec(spec issue) error {
 	log.Printf("%s: planning spec #%d", o.name, spec.Number)
 
-	ok, final, err := o.runAgent("planner", spec, "")
+	ok, design, err := o.runAgent("architect", spec, "")
+	if err != nil || !ok {
+		return o.block(spec.Number, "spec", agentFailure("architect", err).Error())
+	}
+	// A design is free Markdown: only its questions block, if any, is parsed (parsePlan reads questions alone).
+	if _, questions, _ := parsePlan(design); len(questions) > 0 {
+		return o.ask(spec.Number, "architect", questions)
+	}
+	// The planner gets the design as part of the spec: the design's decisions are made, the planner splits the work.
+	designed := spec
+	designed.Body = strings.TrimSpace(spec.Body) + "\n\n## Architecture, from the architect agent\n\n" + design
+
+	ok, final, err := o.runAgent("planner", designed, "")
 	if err != nil || !ok {
 		return o.block(spec.Number, "spec", agentFailure("planner", err).Error())
 	}
@@ -21,9 +33,7 @@ func (o *project) planSpec(spec issue) error {
 		return o.block(spec.Number, "spec", "invalid plan: "+err.Error())
 	}
 	if len(questions) > 0 {
-		// Cheaper to ask than to build every story on a wrong reading of the spec.
-		return o.block(spec.Number, "spec", "❓ the planner needs answers before it can plan this spec:\n\n- "+
-			strings.Join(questions, "\n- ")+"\n\nAnswer them in the spec's description: the planner reads only the description, not the comments.")
+		return o.ask(spec.Number, "planner", questions)
 	}
 
 	numbers := map[string]int{}
@@ -64,6 +74,12 @@ func (o *project) planSpec(spec issue) error {
 		}
 	}
 	return nil
+}
+
+// ask blocks a spec on an agent's questions: cheaper to ask than to build every story on a wrong reading of the spec.
+func (o *project) ask(spec int, role string, questions []string) error {
+	return o.block(spec, "spec", fmt.Sprintf("❓ the %s needs answers before this spec can be planned:\n\n- %s\n\n"+
+		"Answer them in the spec's description: the agents read only the description, not the comments.", role, strings.Join(questions, "\n- ")))
 }
 
 // abandonPlan closes the stories of a plan that could not be created in full, so that retrying the spec does not duplicate them.

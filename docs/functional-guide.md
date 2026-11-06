@@ -26,7 +26,8 @@ The four agent roles:
 
 | Role | Reads | Produces |
 | --- | --- | --- |
-| `planner` | The spec | A plan: 1 to 20 stories, with acceptance criteria and build order. Or, for a spec too ambiguous to plan, questions to answer in the spec |
+| `architect` | The spec and the code | A design: how the spec fits the app (structure, data model, interfaces, decisions), phases for a big change, and the new `docs/architecture.md` that the reviewer then enforces. Or questions, like the planner |
+| `planner` | The spec and the architect's design | A plan: 1 to 20 stories, with acceptance criteria and build order. Or, for a spec too ambiguous to plan, questions to answer in the spec |
 | `tester` | A story | Failing acceptance tests in `tests/acceptance/us-<n>/` |
 | `retester` | A story whose dev reported a `TEST CONFLICT:` (once per story) | Revised acceptance tests, or its reasons for keeping them |
 | `dev` | The story and its tests | Code that makes the tests pass. It may not touch the tests. |
@@ -52,7 +53,8 @@ A spec travels from your issue to a running staging container in eight steps; it
 
 ```mermaid
 flowchart LR
-    S["Spec issue<br/>you write it · spec"] --> P["Planner<br/>1 to 20 stories"]
+    S["Spec issue<br/>you write it · spec"] --> A["Architect<br/>design, phases"]
+    A --> P["Planner<br/>1 to 20 stories"]
     P --> Q["Stories<br/>us-todo, by dependency"]
     Q --> T["Tester<br/>writes failing tests"]
     T --> D["Dev<br/>makes tests pass"]

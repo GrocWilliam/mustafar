@@ -27,13 +27,13 @@ if [ "$ROLE" = revert ]; then # no Claude: the orchestrator undoes a merge whose
   exit 0
 fi
 case "$ROLE" in
-  planner) ;;                               # reads main, writes nothing
+  planner | architect) ;;                   # read main, write nothing
   tester) git checkout -b "$branch" >&2 ;; # each tester run restarts the branch from main
   *) git checkout "$branch" >&2 ;;         # dev and reviewer continue the tester's branch
 esac
 start=$(git rev-parse HEAD)
 rm ~/.ssh/id_ed25519
-case "$ROLE" in planner | reviewer) unset key ;; esac # read-only roles never push
+case "$ROLE" in planner | architect | reviewer) unset key ;; esac # read-only roles never push
 
 {
   cat "/prompts/${ROLE}.md"
@@ -48,8 +48,8 @@ status=0
 timeout 45m claude -p "$(cat /tmp/task.md)" ${MODEL:+--model "$MODEL"} --permission-mode bypassPermissions \
   --output-format stream-json --max-turns 30 --verbose || status=$?
 
-# The planner and the reviewer only read: their output is their final message.
-case "$ROLE" in planner | reviewer) exit "$status" ;; esac
+# The planner, the architect and the reviewer only read: their output is their final message.
+case "$ROLE" in planner | architect | reviewer) exit "$status" ;; esac
 
 if [ "$status" -ne 0 ]; then
   # Partial tests are worse than none: a failed tester pushes nothing.

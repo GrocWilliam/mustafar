@@ -37,7 +37,7 @@ The orchestrator is one Go binary, standard library only, that polls Gitea every
 | --- | --- |
 | `main.go` | Startup, the poll loop, agent slots, `GET /health` on `:8000` |
 | `project.go` | Per-repository setup (labels, `main` protection), dispatch, restart recovery, `block` |
-| `planner.go` | Runs the planner, creates stories, readiness by dependency, budget stop, spec closing |
+| `planner.go` | Runs the architect then the planner, creates stories, readiness by dependency, budget stop, spec closing |
 | `plan.go` | Pure parsing: the plan JSON, `Depends on` / `Part of` lines, plan and cost markers |
 | `pipeline.go` | One story from tester to merge: `deliver`, the dev `attempt` loop, the tester's `revise` on a reported test conflict, `waitCI` |
 | `resume.go` | A retried story continues its branch when the dev had started, skipping the tester |
@@ -100,6 +100,7 @@ A fifth role, `revert`, runs no Claude: it does `git revert` of a merge whose de
 
 | Role | Branch | May change | Checked by the orchestrator |
 | --- | --- | --- | --- |
+| `architect` | `main`, read only | Nothing | Nothing: its final message is appended to the spec body the planner gets; a `{"questions": [...]}` block blocks the spec |
 | `planner` | `main`, read only | Nothing | Plan JSON: 1 to 20 stories, keys unique, dependencies on earlier stories only |
 | `tester` | `agent/us-<n>`, new from `main` | `tests/acceptance/` only | Nothing outside that directory; at least one file in `us-<n>/` |
 | `dev` | `agent/us-<n>` | Anything but the tester's tests and `PROTECTED_PATHS` | Frozen tests, protected paths, CI |
