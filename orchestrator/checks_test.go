@@ -61,6 +61,22 @@ func TestFrozen(t *testing.T) {
 	}
 }
 
+// A story merged meanwhile edited a test this story's tester had edited too: merging main brings both edits in.
+func TestFrozenBothEdited(t *testing.T) {
+	base := map[string]string{"tests/acceptance/us-7/run.sh": "a"}
+	tester := map[string]string{"tests/acceptance/us-7/run.sh": "a-tester"}
+	main := map[string]string{"tests/acceptance/us-7/run.sh": "a-main"}
+	if got := frozen(base, tester, main, map[string]string{"tests/acceptance/us-7/run.sh": "a-tester-main"}); got != nil {
+		t.Errorf("merged both edits: frozen = %q, want none", got)
+	}
+	if got := frozen(base, tester, main, map[string]string{}); !reflect.DeepEqual(got, []string{"tests/acceptance/us-7/run.sh"}) {
+		t.Errorf("deleted: frozen = %q, want it flagged", got)
+	}
+	if got := frozen(base, tester, base, map[string]string{"tests/acceptance/us-7/run.sh": "a-dev"}); !reflect.DeepEqual(got, []string{"tests/acceptance/us-7/run.sh"}) {
+		t.Errorf("main untouched, dev edit: frozen = %q, want it flagged", got)
+	}
+}
+
 func TestOutside(t *testing.T) {
 	got := outside([]string{"tests/acceptance/us-2/run.sh", "tests/acceptance/us-1/run.sh", "Makefile"}, "tests/acceptance/us-2/")
 	if want := []string{"tests/acceptance/us-1/run.sh", "Makefile"}; !reflect.DeepEqual(got, want) {

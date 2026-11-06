@@ -58,7 +58,8 @@ func drifted(head map[string]string, prefix string, allowed ...map[string]string
 }
 
 // frozen lists the acceptance test files the dev changed. Files the tester wrote or rewrote must stay exactly as it
-// committed them; the other ones may also match main, which a merge of main into the branch brings in.
+// committed them, unless main changed them too: a merge of main then holds both edits. The other ones may also
+// match main, which a merge of main into the branch brings in.
 func frozen(base, tester, main, head map[string]string) []string {
 	owned := changed(base, tester, acceptanceDir)
 	var touched []string
@@ -68,7 +69,10 @@ func frozen(base, tester, main, head map[string]string) []string {
 		}
 	}
 	for _, path := range owned {
-		if head[path] != tester[path] {
+		// shortcut: a file both the tester and main changed is only checked for being kept, not compared line by line;
+		// the reviewer sees its diff. Compute the three-way merge here if a dev ever abuses it.
+		mergedByMain := main[path] != base[path] && head[path] != ""
+		if head[path] != tester[path] && !mergedByMain {
 			touched = append(touched, path)
 		}
 	}
