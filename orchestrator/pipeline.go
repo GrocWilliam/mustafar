@@ -11,19 +11,43 @@ import (
 
 const (
 	maxAttempts   = 3
+	maxRevisions  = 3 // tester revisions per story: a story that moves things can break several earlier tests in turn
 	ciTimeout     = 30 * time.Minute
 	acceptanceDir = "tests/acceptance/"
 )
 
 // contract is what a story's checks compare against: the tree the tester started from, and the tree holding its
-// tests (its last commit, or its revision). revised is set once the tester has revised them, which it does once.
+// tests (its last commit, or its latest revision). revisions counts the tester's revisions, up to maxRevisions.
 type contract struct {
 	base, tests map[string]string
-	revised     bool
+	revisions   int
 }
 
 // conflictLine is how the dev reports a test that cannot pass (agents/prompts/dev.md).
 var conflictLine = regexp.MustCompile(`(?m)^\W*TEST CONFLICT:`)
+
+// ciFailed starts the feedback a dev gets after a CI failure.
+const ciFailed = "CI is `"
+
+// What follows a dev run, besides the checks.
+const (
+	goOn   = iota
+	revise // send the tests back to the tester
+	stuck  // nothing can change: the next attempts would check the same commit
+)
+
+// next decides what follows a dev run. A dev that adds no commit after a CI failure is stuck on the tests, whether
+// or not it wrote a `TEST CONFLICT:` line: the tester revises them, or, its revisions used up, the story stops.
+func next(final, feedback string, committed bool, revisions int) int {
+	unchanged := !committed && strings.HasPrefix(feedback, ciFailed)
+	switch {
+	case (conflictLine.MatchString(final) || unchanged) && revisions < maxRevisions:
+		return revise
+	case unchanged:
+		return stuck
+	}
+	return goOn
+}
 
 // deliver takes a US from acceptance tests to merge: tester, then up to maxAttempts dev cycles.
 // Agents write code; only the checks here decide. label tracks the US's current label for block().
@@ -68,21 +92,39 @@ func (o *project) attempt(is issue, branch string, c *contract, feedback string,
 		}
 		return msg, nil
 	}
-	if skipDev {
-		// the branch head is the dev's earlier work: straight to the checks
-	} else if ok, final, err := o.runAgent("dev", is, feedback); err != nil {
-		return "", err
-	} else {
+	if !skipDev {
+		before, err := o.gitea.branchHead(branch)
+		if err != nil {
+			return "", err
+		}
+		ok, final, err := o.runAgent("dev", is, feedback)
+		if err != nil {
+			return "", err
+		}
+		after, err := o.gitea.branchHead(branch)
+		if err != nil {
+			return "", err
+		}
 		summary = clip(strings.TrimSpace(final), 3000)
-		if conflictLine.MatchString(final) && !c.revised {
-			if rejected, err := o.revise(is, branch, c, conflictReport(final)); err != nil {
+		switch next(final, feedback, after != before, c.revisions) {
+		case revise:
+			report := conflictReport(final)
+			if !conflictLine.MatchString(final) {
+				report = "The dev added no commit after this CI failure: it could not make the tests pass. Check whether the failing tests contradict the story, pin what an earlier story defined that this one changes, or are flaky.\n\n" +
+					clip(feedback, 8000) + "\n\nThe dev's summary:\n\n" + summary
+			}
+			if rejected, err := o.revise(is, branch, c, report); err != nil {
 				return "", err
 			} else if rejected != "" {
 				return rejected, nil
 			}
-		} else if !ok {
-			// Its own explanation (a contradiction in the tests, a missing tool...) beats a generic retry message.
-			return retry("Your previous run stopped before finishing (it failed, or produced no new commit). Whatever it had done is committed on the branch: continue from it, make the acceptance tests pass and commit your work.")
+		case stuck:
+			return "", fmt.Errorf("the dev added no commit after a CI failure, and the tester already revised the tests %d times: the tests or the story need a human. Last CI feedback:\n\n%s", c.revisions, clip(feedback, 3000))
+		case goOn:
+			if !ok {
+				// Its own explanation (a contradiction in the tests, a missing tool...) beats a generic retry message.
+				return retry("Your previous run stopped before finishing (it failed, or produced no new commit). Whatever it had done is committed on the branch: continue from it, make the acceptance tests pass and commit your work.")
+			}
 		}
 	}
 	pr, err := o.ensurePR(is, branch)
@@ -189,7 +231,7 @@ func (o *project) test(is issue, branch string, c *contract) error {
 	return nil
 }
 
-// revise runs the tester again on the tests the dev reported as conflicting (report: the dev's summary). The checks
+// revise runs the tester again on the tests the dev reported as conflicting or could not make pass (report: why). The checks
 // then hold the dev to the revised tests. It returns the dev's feedback when the revision cannot go ahead or the
 // tester kept the tests, "" to go on with the checks.
 func (o *project) revise(is issue, branch string, c *contract, report string) (string, error) {
@@ -205,7 +247,7 @@ func (o *project) revise(is issue, branch string, c *contract, report string) (s
 	if touched := frozen(c.base, c.tests, mainTree, before); len(touched) > 0 {
 		return "You modified frozen acceptance tests: " + list(touched) + ". Restore them exactly as committed by the tester; report a conflict with a `TEST CONFLICT:` line instead of editing the test.", nil
 	}
-	c.revised = true // once per story, whatever the tester decides
+	c.revisions++ // counted whatever the tester decides
 	ok, final, err := o.runAgent("retester", is, report)
 	if err != nil || !ok {
 		return "", agentFailure("retester", err)

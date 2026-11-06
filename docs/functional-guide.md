@@ -29,7 +29,7 @@ The four agent roles:
 | `architect` | The spec and the code | A design: how the spec fits the app (structure, data model, interfaces, decisions), phases for a big change, and the new `docs/architecture.md` that the reviewer then enforces. Or questions, like the planner |
 | `planner` | The spec and the architect's design | A plan: 1 to 20 stories, with acceptance criteria and build order. Or, for a spec too ambiguous to plan, questions to answer in the spec |
 | `tester` | A story | Failing acceptance tests in `tests/acceptance/us-<n>/` |
-| `retester` | A story whose dev reported a `TEST CONFLICT:` (once per story) | Revised acceptance tests, or its reasons for keeping them |
+| `retester` | A story whose dev reported a `TEST CONFLICT:`, or added no commit after a CI failure (up to 3 times per story; then the story blocks at once) | Revised acceptance tests, or its reasons for keeping them |
 | `dev` | The story and its tests | Code that makes the tests pass. It may not touch the tests. |
 | `reviewer` | Spec, story and diff | A criterion → test table, then `VERDICT: approve` or `VERDICT: changes`, with notes |
 

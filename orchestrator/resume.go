@@ -77,7 +77,9 @@ func (o *project) resume(is issue, branch string) (c contract, ok bool, err erro
 	if !ok {
 		return c, false, nil
 	}
-	c.revised = revised
+	if revised {
+		c.revisions = 1 // a human retry gets the revisions back but one
+	}
 	if c.base, err = o.gitea.tree(baseSHA); err != nil {
 		return c, false, err
 	}

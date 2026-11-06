@@ -97,3 +97,26 @@ func TestConflictReport(t *testing.T) {
 		t.Error("a mid-line mention must not count as a report")
 	}
 }
+
+func TestNext(t *testing.T) {
+	ci := ciFailed + "failure` on your last commit"
+	cases := []struct {
+		name, final, feedback string
+		committed             bool
+		revisions, want       int
+	}{
+		{"first run, nothing to add", "done", "", false, 0, goOn},
+		{"fixed after CI", "fixed", ci, true, 0, goOn},
+		{"reported conflict", "TEST CONFLICT: us-4: keys", "", true, 0, revise},
+		{"stuck without the line", "us-4 pins the keys, I cannot edit it", ci, false, 0, revise},
+		{"stuck, revisions left", "flaky", ci, false, maxRevisions - 1, revise},
+		{"stuck, revisions used", "flaky", ci, false, maxRevisions, stuck},
+		{"reported, revisions used, committed", "TEST CONFLICT: x", ci, true, maxRevisions, goOn},
+		{"no commit after a review", "nothing to change", "The reviewer requested changes", false, 0, goOn},
+	}
+	for _, c := range cases {
+		if got := next(c.final, c.feedback, c.committed, c.revisions); got != c.want {
+			t.Errorf("%s: next = %d, want %d", c.name, got, c.want)
+		}
+	}
+}
