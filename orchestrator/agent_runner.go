@@ -139,6 +139,20 @@ func (o *project) runAgent(role string, is issue, feedback string) (bool, string
 	}
 }
 
+// maxTurns is an agent run's turn cap. The tester's grows with the story: a big one has many criteria and frozen tests to read.
+func maxTurns(role, complexity string) int {
+	if role != "tester" {
+		return 30
+	}
+	switch complexity {
+	case "low":
+		return 30
+	case "high":
+		return 60
+	}
+	return 45 // medium or unrated, like settings.model
+}
+
 func (o *project) runOnce(role string, is issue, feedback string) (bool, string, error) {
 	key, err := os.ReadFile(o.cfg.DeployKeyFile)
 	if err != nil {
@@ -153,6 +167,7 @@ func (o *project) runOnce(role string, is issue, feedback string) (bool, string,
 	env := append([]string{
 		"ROLE=" + role,
 		"MODEL=" + model,
+		"MAX_TURNS=" + strconv.Itoa(maxTurns(role, complexity)),
 		"REPO_URL=" + o.sshURL,
 		"DEPLOY_KEY=" + string(key),
 		"ISSUE_NUMBER=" + strconv.Itoa(is.Number),

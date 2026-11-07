@@ -89,7 +89,7 @@ The orchestrator passes everything through environment variables: `ROLE`, `REPO_
 3. Picks the branch: `planner` stays on `main`; `tester` creates `agent/us-<n>` from `main`; `dev` and `reviewer` check out the tester's branch.
 4. Deletes the key file. `planner` and `reviewer` also drop the variable, so they can never push.
 5. Builds the task from `/prompts/<role>.md`, the issue title and body, and the feedback from the previous attempt.
-6. Runs `timeout 45m claude -p "$task" --permission-mode bypassPermissions --output-format stream-json --max-turns 30 --verbose`. Stdout carries only Claude's stream; everything else goes to stderr.
+6. Runs `timeout 45m claude -p "$task" --permission-mode bypassPermissions --output-format stream-json --max-turns "${MAX_TURNS:-30}" --verbose`. Stdout carries only Claude's stream; everything else goes to stderr.
 7. `planner` and `reviewer` exit here: their output is their final message.
 8. If HEAD did not move, exits with code 3 ("agent produced no commit").
 9. Writes the key back and pushes: `tester` force-pushes (each tester run restarts the branch), `dev` pushes without force.
@@ -211,7 +211,7 @@ There is deliberately no timeout-based requeue: a slow agent must not be duplica
 | `AGENT_IMAGE`, `AGENT_NETWORK` | `forge-agent`, `forge` | Agent image and network |
 | `DEPLOY_KEY_FILE` | `/run/secrets/deploy_key` | Private key mounted into the orchestrator |
 
-Hard-coded limits: 3 dev attempts, 20 stories per plan, 30 turns and 45 minutes per agent run, 30 minutes for CI, 1 minute for `/health`.
+Hard-coded limits: 3 dev attempts, 20 stories per plan, 30 turns per agent run (tester: 30/45/60 by story complexity), 45 minutes per agent run, 30 minutes for CI, 1 minute for `/health`.
 
 ## Security model
 

@@ -107,7 +107,7 @@ The forge stops itself rather than loop or spend without limit; `us-blocked` is 
 | Protected paths | No pull request may touch `PROTECTED_PATHS` (default `.gitea/`) | Attempt rejected |
 | Review | Only an explicit `VERDICT: approve` counts; the reviewer may not push | Attempt rejected, or story blocked if it pushed |
 | Budget | Agent cost per spec, retries included, capped by `MAX_COST_PER_SPEC` (default $20) | Spec and its waiting stories → `us-blocked` |
-| Agent limits | 30 turns and 45 minutes per agent run | That run fails |
+| Agent limits | 30 turns (tester: 30/45/60 by story complexity) and 45 minutes per agent run | That run fails |
 | Claude usage limit | The subscription's 5-hour or weekly limit | The agent waits for the reset and reruns; no attempt is used |
 | Staging | `GET /health` must answer 200 within one minute after a merge | Merge reverted, previous version redeployed, story → `us-blocked` |
 | Restart | Stories in progress or in review go back to `us-todo` | Story resumes its branch, or starts over if the dev had not started |

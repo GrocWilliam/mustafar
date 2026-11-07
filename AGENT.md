@@ -58,7 +58,7 @@ Labels: `spec`, `us-todo`, `us-in-progress`, `us-review`, `us-blocked`. "Done" =
 - **Retries**: at most 3 dev cycles per US, then `us-blocked` + a comment explaining the failure. `us-blocked` is the **only** point of human intervention.
 - **Budget**: cumulative cost per spec (the `total_cost_usd` field of the `result` message); exceeding `MAX_COST_PER_SPEC` (or the spec's own `<!-- forge:budget=X -->` marker, set from the UI) → the spec and its remaining US go to `us-blocked`.
 - **Recovery**: on startup, the orchestrator removes the agent containers its previous run left (label `forge.agent`) and moves every `us-in-progress` US back to `us-todo` (no hourly timeout: a slow agent must not be duplicated).
-- `--max-turns 30` and a 45-minute timeout per agent run.
+- `--max-turns $MAX_TURNS` (30; the tester gets 30/45/60 for low/medium/high complexity, `maxTurns` in `orchestrator/agent_runner.go`) and a 45-minute timeout per agent run.
 - **Questions**: a spec too ambiguous to plan gets questions instead of stories (`{"questions": [...]}`): the spec goes to `us-blocked` with them, the human answers in its description and sets `spec` again.
 - **Guard hook**: `agents/guard.mjs`, a `PreToolUse` hook in the agent image, refuses during the run what the checks would reject after it: dev edits under `tests/acceptance/` or `PROTECTED_PATHS`, tester edits outside `tests/acceptance/`, any edit by the planner or reviewer, git push, fetch, remote, rebase, switch or amend, and any written content holding a credential (the agent's own key by value, or a known token format). It is a shortcut, not the authority: the post-run checks stay.
 - **Stop check**: `agents/stop-check.sh`, a `Stop` hook, runs what CI runs (`make test`, `make build`, every acceptance `run.sh`) and checks nothing is left uncommitted when the dev finishes. A failure sends the dev back to work in the same session, at most twice per run; then CI and the retry feedback take over.
@@ -67,7 +67,7 @@ Labels: `spec`, `us-todo`, `us-in-progress`, `us-review`, `us-blocked`. "Done" =
 
 ## Implementation requirements
 
-- **Invocation**: `claude -p "$(cat /task.md)" --permission-mode bypassPermissions --output-format stream-json --max-turns 30 --verbose`. Top-level stream types: `system`, `assistant`, `user`, `result`; `tool_use` entries are content blocks inside `assistant` messages.
+- **Invocation**: `claude -p "$(cat /task.md)" --permission-mode bypassPermissions --output-format stream-json --max-turns "$MAX_TURNS" --verbose`. Top-level stream types: `system`, `assistant`, `user`, `result`; `tool_use` entries are content blocks inside `assistant` messages.
 - **Comments**: one progress comment per agent run, **edited in place** (role, current step, tools used), then replaced by a final summary. Not one comment per step.
 - **Prompts**: one file per role in `agents/prompts/{role}.md`, completed with the issue's title, body and criteria.
 - **Language**: code, docstrings and issue comments in English.
