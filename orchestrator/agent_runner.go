@@ -141,6 +141,9 @@ func (o *project) runAgent(role string, is issue, feedback string) (bool, string
 
 // maxTurns is an agent run's turn cap. The tester's grows with the story: a big one has many criteria and frozen tests to read.
 func maxTurns(role, complexity string) int {
+	if role == "integrator" { // it reads several stories' work, and runs the whole suite
+		return 60
+	}
 	if role != "tester" {
 		return 30
 	}
@@ -158,9 +161,9 @@ func (o *project) runOnce(role string, is issue, feedback string) (bool, string,
 	if err != nil {
 		return false, "", err
 	}
-	// Designing and planning a whole spec are the hardest calls: they get the high model; a story's agents get the one its complexity names.
+	// Designing, planning and integrating a whole spec are the hardest calls: they get the high model; a story's agents get the one its complexity names.
 	complexity := complexityOf(is.Body)
-	if role == "planner" || role == "architect" {
+	if role == "planner" || role == "architect" || role == "integrator" {
 		complexity = "high"
 	}
 	model := o.settings().model(complexity)
@@ -170,6 +173,7 @@ func (o *project) runOnce(role string, is issue, feedback string) (bool, string,
 		"MAX_TURNS=" + strconv.Itoa(maxTurns(role, complexity)),
 		"REPO_URL=" + o.sshURL,
 		"DEPLOY_KEY=" + string(key),
+		"BASE_BRANCH=" + is.base,
 		"ISSUE_NUMBER=" + strconv.Itoa(is.Number),
 		"ISSUE_TITLE=" + is.Title,
 		"ISSUE_BODY=" + is.Body,

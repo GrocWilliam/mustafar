@@ -54,6 +54,10 @@ func next(final, feedback string, committed bool, revisions int) int {
 // Attempts and feedback live in memory: a restart re-queues the US, which resumes its branch if the dev had started.
 func (o *project) deliver(is issue, label *string) error {
 	branch := fmt.Sprintf("agent/us-%d", is.Number)
+	var err error
+	if is.base, err = o.targetOf(is); err != nil {
+		return err
+	}
 	c, resumed, err := o.resume(is, branch)
 	if err != nil {
 		return err
@@ -152,16 +156,16 @@ func (o *project) attempt(is issue, branch string, c *contract, feedback string,
 	if err != nil {
 		return "", err
 	}
-	// The dev may merge main into the branch, which brings in the files merged by other stories meanwhile.
-	mainTree, err := o.treeOf(o.base)
+	// The dev may merge the target into the branch, which brings in the files merged by other stories meanwhile.
+	targetTree, err := o.treeOf(is.base)
 	if err != nil {
 		return "", err
 	}
-	if touched := frozen(c.base, c.tests, mainTree, headTree); len(touched) > 0 {
+	if touched := frozen(c.base, c.tests, targetTree, headTree); len(touched) > 0 {
 		return retry("You modified frozen acceptance tests: " + list(touched) + ". Restore them exactly as committed by the tester and make the code pass them instead.")
 	}
 	for _, prefix := range o.cfg.Protected {
-		if touched := drifted(headTree, prefix, c.base, mainTree); len(touched) > 0 {
+		if touched := drifted(headTree, prefix, c.base, targetTree); len(touched) > 0 {
 			return retry("You modified protected paths: " + list(touched) + ". Revert these changes.")
 		}
 	}
@@ -205,7 +209,7 @@ func conflictReport(final string) string {
 // its tester ran, and a revision may follow them since: its trees hold the dev's work too.
 func (o *project) test(is issue, branch string, c *contract) error {
 	var err error
-	if c.base, err = o.treeOf(o.base); err != nil {
+	if c.base, err = o.treeOf(is.base); err != nil {
 		return err
 	}
 	if ok, _, err := o.runAgent("tester", is, ""); err != nil || !ok {
@@ -218,8 +222,9 @@ func (o *project) test(is issue, branch string, c *contract) error {
 	if stray := outside(changed(c.base, c.tests, ""), acceptanceDir); len(stray) > 0 {
 		return fmt.Errorf("the tester changed files outside `%s`: %s", acceptanceDir, list(stray))
 	}
-	if len(changed(c.base, c.tests, ownDir)) == 0 {
-		return fmt.Errorf("the tester wrote no acceptance tests in `%s`", ownDir)
+	// On a spec's branch this run.sh is all CI runs for the story: without one, the story would pass on nothing.
+	if _, ok := c.tests[ownDir+"run.sh"]; !ok || len(changed(c.base, c.tests, ownDir)) == 0 {
+		return fmt.Errorf("the tester wrote no acceptance tests in `%s`, or no `run.sh`", ownDir)
 	}
 	// A story may change behavior that earlier stories' tests pin down: the tester updates those tests, visibly.
 	if earlier := outside(changed(c.base, c.tests, acceptanceDir), ownDir); len(earlier) > 0 {
@@ -239,12 +244,12 @@ func (o *project) revise(is issue, branch string, c *contract, report string) (s
 	if err != nil {
 		return "", err
 	}
-	mainTree, err := o.treeOf(o.base)
+	targetTree, err := o.treeOf(is.base)
 	if err != nil {
 		return "", err
 	}
 	// The revision would adopt the dev's own edits of the tests as the tester's.
-	if touched := frozen(c.base, c.tests, mainTree, before); len(touched) > 0 {
+	if touched := frozen(c.base, c.tests, targetTree, before); len(touched) > 0 {
 		return "You modified frozen acceptance tests: " + list(touched) + ". Restore them exactly as committed by the tester; report a conflict with a `TEST CONFLICT:` line instead of editing the test.", nil
 	}
 	c.revisions++ // counted whatever the tester decides
@@ -270,13 +275,20 @@ func (o *project) revise(is issue, branch string, c *contract, report string) (s
 }
 
 // ensurePR returns the branch's pull request, opening it on the first attempt.
-// A re-run of a blocked US force-pushes the same branch, so its pull request may already exist.
+// A re-run of a blocked US force-pushes the same branch, so its pull request may already exist, with another target
+// if its spec was delivered or got its branch since.
 func (o *project) ensurePR(is issue, branch string) (*pullRequest, error) {
 	pr, err := o.gitea.findPR(branch)
-	if err != nil || pr != nil {
+	if err != nil {
+		return nil, err
+	}
+	if pr != nil {
+		if pr.Base.Ref != is.base {
+			err = o.gitea.retarget(pr.Number, is.base)
+		}
 		return pr, err
 	}
-	if pr, err = o.gitea.openPR(is.Title, fmt.Sprintf("Closes #%d", is.Number), branch, o.base); err != nil {
+	if pr, err = o.gitea.openPR(is.Title, fmt.Sprintf("Closes #%d", is.Number), branch, is.base); err != nil {
 		return nil, err
 	}
 	_, err = o.gitea.comment(is.Number, "🔀 Pull request opened: "+pr.HTMLURL)
@@ -315,16 +327,16 @@ func (o *project) freshCI(is issue, branch string, pr *pullRequest) error {
 	if state, err := o.gitea.ciState(head); err != nil || (state != "failure" && state != "error") {
 		return err
 	}
-	behind, err := o.gitea.behind(branch, o.base)
+	behind, err := o.gitea.behind(branch, is.base)
 	if err != nil || behind == 0 {
 		return err
 	}
 	if err := o.gitea.updatePR(pr.Number); errors.Is(err, errConflict) {
-		return nil // the dev gets the CI failure, and the conflict once it merges main
+		return nil // the dev gets the CI failure, and the conflict once it merges the target
 	} else if err != nil {
 		return err
 	}
-	_, err = o.gitea.comment(is.Number, fmt.Sprintf("🔄 CI had failed on the resumed branch: merged `%s` into it for a fresh CI run.", o.base))
+	_, err = o.gitea.comment(is.Number, fmt.Sprintf("🔄 CI had failed on the resumed branch: merged `%s` into it for a fresh CI run.", is.base))
 	return err
 }
 

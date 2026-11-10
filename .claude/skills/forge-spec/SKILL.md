@@ -5,7 +5,7 @@ description: Write a spec the forge can build and open it, creating the project 
 
 # Forge spec
 
-A spec is a Gitea issue labelled `spec` in a project (a repo with the `forge` topic). Opening one starts paid, autonomous agent runs: planner, then per story tester, dev (up to 3 attempts), reviewer, merge, staging deploy. So **show the final spec and get the user's OK before opening it.**
+A spec is a Gitea issue labelled `spec` in a project (a repo with the `forge` topic). Opening one starts paid, autonomous agent runs: planner, then per story tester, dev (up to 3 attempts), reviewer, merge into the spec's branch, then every acceptance test on the whole spec, an integrator agent if needed, and the merge to `main` and staging. So **show the final spec and get the user's OK before opening it.**
 
 Work from the forge root. Never print the admin password or `.env` values.
 
@@ -18,7 +18,7 @@ Save it to a file in your scratchpad: first line `# Title`, then the body. Model
 - **Concrete, testable behavior**: inputs and exact outputs, commands and their output, HTTP requests with status codes and bodies, error cases. No "fast", "nice", "robust".
 - **Interfaces by name**: modules, functions, CLI commands, endpoints, file formats, how to start it (`python3 -m app`, `node server.js`...).
 - **Stack**: language and whether dependencies are allowed. CI and agents run Debian bookworm with Node 26, Python 3, make, git and Chromium (`$CHROMIUM_PATH`, for browser tests); anything else must be installable by `make test`.
-- **A service** must listen on port 8080 (or `$PORT`) and answer `GET /health` with 200: the planner then adds a `Dockerfile` and every merge is deployed to staging. Tests never use Docker.
+- **A service** must listen on port 8080 (or `$PORT`) and answer `GET /health` with 200: the planner then adds a `Dockerfile` and every spec reaching `main` is deployed to staging. Tests never use Docker.
 - **Size**: at most 20 stories of one ~30-turn dev session each. Split a bigger product into successive specs.
 - **Existing project**: read its code first (`git clone http://localhost:3000/$repo.git` into the scratchpad) and describe only the change, in the terms the code already uses.
 

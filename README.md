@@ -10,7 +10,7 @@ Everything runs on one machine with Docker Compose, and every step is logged as 
 spec issue ──planner──▶ us-todo stories (with dependencies)
                           │
                           ▼
-              tester ─▶ dev ─▶ CI ─▶ reviewer ─▶ squash-merge ─▶ staging deploy
+              tester ─▶ dev ─▶ CI ─▶ reviewer ─▶ squash-merge into spec/<n> ─▶ (last story) main ─▶ staging deploy
                          ▲      │        │                          │
                          └──────┴────────┘                   /health fails?
                        retry, up to 3 attempts               → revert + us-blocked
@@ -21,7 +21,7 @@ spec issue ──planner──▶ us-todo stories (with dependencies)
 | `gitea` | Forge, work queue and source of truth. Web on `:3000`, SSH on `:2222`. |
 | `runner` | Gitea Actions runner: CI only (`make test` + `tests/acceptance/*/run.sh`). No LLM. |
 | `orchestrator` | Go service on `:8000`, which also serves the forge UI. The only thing that changes labels; dispatches agents, merges, deploys, reverts. |
-| `agent` | One-shot Claude Code container, one role per run: `planner`, `tester`, `dev`, `reviewer`, `retester` (revises tests the dev reports as conflicting). |
+| `agent` | One-shot Claude Code container, one role per run: `planner`, `tester`, `dev`, `reviewer`, `retester` (revises tests the dev reports as conflicting), `integrator` (fixes what stops a finished spec reaching `main`). |
 | staging | One container per project, `forge-staging-<owner>-<repo>`, on `localhost:<9000 + repo id>`. |
 
 ## Setup
@@ -79,11 +79,13 @@ Open an issue with explicit acceptance criteria and the `us-todo` label (e.g. in
 3. The `ci` workflow runs (repo › Actions).
 4. A `reviewer` comment ends with `VERDICT: approve`; the PR is squash-merged and the issue closed.
 
-Rejections show up as `🔁 Attempt n/3` comments with the feedback given to the dev. After 3 attempts the issue moves to `us-blocked`. If `main` moved under a finished story, a `🔄` comment shows the orchestrator merging `main` into the branch and rerunning CI first.
+Rejections show up as `🔁 Attempt n/3` comments with the feedback given to the dev. After 3 attempts the issue moves to `us-blocked`. If its target branch moved under a finished story, a `🔄` comment shows the orchestrator merging it into the branch and rerunning CI first.
+
+Stories merge into their spec's own branch, `spec/<n>`, so specs built in parallel do not collide, and each story runs only its own acceptance tests. Once its last story is closed, every acceptance test runs on the whole spec. If that fails or conflicts with `main`, an `integrator` agent fixes it, then the orchestrator merges the spec into `main` through one pull request.
 
 ### Staging
 
-Once a project has a `Dockerfile` (the planner adds one when a spec describes a service), every merge is deployed to `http://localhost:<9000 + repo id>`; the 🚀 comment gives the URL. If `GET /health` does not answer 200 within a minute, the merge is reverted on `main`, the previous version redeployed, and the story reopened as `us-blocked`.
+Once a project has a `Dockerfile` (the planner adds one when a spec describes a service), every spec reaching `main` is deployed to `http://localhost:<9000 + repo id>`; the 🚀 comment gives the URL. If `GET /health` does not answer 200 within a minute, the merge is reverted on `main`, the previous version redeployed, and the spec set to `us-blocked`.
 
 ### Retrying blocked work
 

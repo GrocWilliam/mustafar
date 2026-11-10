@@ -16,7 +16,7 @@ type project struct {
 	sshURL string // agents clone and push through it, inside the compose network
 	ready  bool
 	base   string // the repository's default branch, read on setup
-	// merging serializes this project's merges, so each one is checked against the latest main.
+	// merging serializes this project's merges, so each one is checked against the latest state of its target branch.
 	merging sync.Mutex
 }
 
@@ -52,7 +52,7 @@ func (o *project) poll() error {
 		o.base, o.ready = base, true
 		o.pmu.Unlock()
 	}
-	if err := o.closeFinishedSpecs(); err != nil {
+	if err := o.landFinishedSpecs(); err != nil {
 		return err
 	}
 	specs, err := o.gitea.issuesWith("spec")

@@ -4,6 +4,7 @@
 set -euo pipefail
 
 branch="agent/us-${ISSUE_NUMBER}"
+[ "$ROLE" != integrator ] || branch="agent/spec-${ISSUE_NUMBER}"
 
 # The key lives on disk only while git needs it, so Claude cannot read it from ~/.ssh.
 # Not exported: claude does not inherit it (a same-user /proc read could still find it).
@@ -27,16 +28,16 @@ if [ "$ROLE" = revert ]; then # no Claude: the orchestrator undoes a merge whose
   exit 0
 fi
 case "$ROLE" in
-  planner | architect) ;;                   # read main, write nothing
-  tester) git checkout -b "$branch" >&2 ;; # each tester run restarts the branch from main
-  *) git checkout "$branch" >&2 ;;         # dev and reviewer continue the tester's branch
+  planner | architect) ;;                                        # read main, write nothing
+  tester) git checkout -b "$branch" "origin/$BASE_BRANCH" >&2 ;; # each tester run restarts the branch from its target
+  *) git checkout "$branch" >&2 ;;                               # dev and reviewer continue the tester's branch, the integrator the orchestrator's copy of the spec
 esac
 start=$(git rev-parse HEAD)
 rm ~/.ssh/id_ed25519
 case "$ROLE" in planner | architect | reviewer) unset key ;; esac # read-only roles never push
 
 {
-  cat "/prompts/${ROLE}.md"
+  sed "s|{{BASE_BRANCH}}|${BASE_BRANCH:-}|g" "/prompts/${ROLE}.md"
   printf '\n\n## Issue #%s: %s\n\n%s\n' "$ISSUE_NUMBER" "$ISSUE_TITLE" "$ISSUE_BODY"
   if [ -n "${FEEDBACK:-}" ]; then
     printf '\n## Feedback: why your previous attempt was rejected\n\n%s\n' "$FEEDBACK"

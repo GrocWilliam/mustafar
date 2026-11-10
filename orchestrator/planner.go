@@ -153,41 +153,24 @@ func (o *project) dependenciesClosed(is issue) bool {
 	return true
 }
 
-// closeFinishedSpecs closes every active spec whose stories are all closed, with a cost summary.
-func (o *project) closeFinishedSpecs() error {
+// landFinishedSpecs starts landing every active spec whose stories are all closed. It waits on CI and a deployment, so
+// each runs in the background, like a story.
+func (o *project) landFinishedSpecs() error {
 	specs, err := o.gitea.issuesWith("spec-active")
 	if err != nil {
 		return err
 	}
 	for _, spec := range specs {
-		stories, err := o.storiesOf(spec.Number)
-		if err != nil {
-			return err
-		}
-		finished := true
-		for _, number := range stories {
-			if story, err := o.gitea.getIssue(number); err != nil {
-				return err
-			} else if story.State != "closed" {
-				finished = false
-				break
-			}
-		}
-		if !finished {
+		if o.isRunning(spec.Number) {
 			continue
 		}
-		cost, _, err := o.specCost(spec.Number)
+		finished, stories, err := o.specFinished(spec.Number)
 		if err != nil {
 			return err
 		}
-		msg := fmt.Sprintf("✅ All %d stories are done. Total agent cost: $%.2f.", len(stories), cost)
-		if _, err := o.gitea.comment(spec.Number, msg); err != nil {
-			return err
+		if finished && !o.start(spec.Number, func() error { return o.landSpec(spec, stories) }) {
+			return nil
 		}
-		if err := o.gitea.closeIssue(spec.Number); err != nil {
-			return err
-		}
-		log.Printf("%s: spec #%d done ($%.2f)", o.name, spec.Number, cost)
 	}
 	return nil
 }

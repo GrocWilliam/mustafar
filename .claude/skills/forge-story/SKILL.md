@@ -5,7 +5,7 @@ description: Add a single user story to an existing forge project, skipping the 
 
 # Forge story
 
-A story is a Gitea issue labelled `us-todo`. Opening one starts paid agent runs (tester, dev up to 3 attempts, reviewer, merge, staging deploy). So **show the final story and get the user's OK before opening it.** With the `priority` label, the orchestrator starts it before every other ready `us-todo` story. Running agents are not interrupted: it takes the next free slot.
+A story is a Gitea issue labelled `us-todo`. Opening one starts paid agent runs (tester, dev up to 3 attempts, reviewer, merge). So **show the final story and get the user's OK before opening it.** With the `priority` label, the orchestrator starts it before every other ready `us-todo` story. Running agents are not interrupted: it takes the next free slot.
 
 Work from the forge root. Never print the admin password or `.env` values.
 
@@ -30,7 +30,7 @@ Complexity: <low|medium|high>
 
 `Complexity` picks the agents' model (the forge's `MODEL_LOW`/`MEDIUM`/`HIGH` settings): `low` for mechanical work, `medium` (the default when missing) for most stories, `high` only for design-heavy work such as a new data model, concurrency or security.
 
-`Part of` is required: the forge UI, its retry button and the spend per spec treat an issue without it as a spec. Use the spec the story belongs to, otherwise the project's latest spec. Its cost counts toward that spec's budget, but the spec does not wait for the story before closing.
+`Part of` is required: the forge UI, its retry button and the spend per spec treat an issue without it as a spec. Use the spec the story belongs to, otherwise the project's latest spec. Its cost counts toward that spec's budget. While that spec is open, the story merges into its branch `spec/<n>`, and the spec waits for the story before reaching `main`; once the spec is closed, the story merges into `main` directly.
 
 ## 2. Open it
 

@@ -21,13 +21,27 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: acceptance tests (frozen, written by the tester agent)
+        shell: bash
+        env: # through the environment: branch names must never be pasted into the script
+          HEAD_REF: ${{ github.head_ref }}
+          BASE_REF: ${{ github.base_ref }}
         run: |
-          # Build once for every script of this shard; scripts skip their own build when FORGE_PREBUILT is set.
-          if make -n build >/dev/null 2>&1; then make build; export FORGE_PREBUILT=1; fi
+          # A story of a spec answers for its own tests; a spec reaching main, or a story going straight to it, for all of them.
+          pattern='tests/acceptance/*/run.sh'
+          case "$BASE_REF:$HEAD_REF" in
+            spec/*:agent/us-*) pattern="tests/acceptance/us-${HEAD_REF#agent/us-}/run.sh" ;;
+          esac
+          scripts=()
           i=0
-          for script in tests/acceptance/*/run.sh; do
+          for script in $pattern; do
             [ -e "$script" ] || continue
             [ $((i++ % 3)) -eq ${{ matrix.shard }} ] || continue
+            scripts+=("$script")
+          done
+          [ ${#scripts[@]} -gt 0 ] || exit 0
+          # Build once for every script of this shard; scripts skip their own build when FORGE_PREBUILT is set.
+          if make -n build >/dev/null 2>&1; then make build; export FORGE_PREBUILT=1; fi
+          for script in "${scripts[@]}"; do
             echo "== $script"
             bash "$script"
           done

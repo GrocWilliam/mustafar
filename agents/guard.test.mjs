@@ -26,8 +26,15 @@ no('dev', 'Bash', { command: 'cat tests/acceptance/us-3/run.sh | tee /tmp/copy' 
 no('dev', 'Bash', { command: 'rm -rf node_modules && bash tests/acceptance/us-3/run.sh' });
 no('dev', 'Bash', { command: 'git checkout -- tests/acceptance/us-3/run.sh' });
 
+// integrator: fixes code, under the dev's rules
+yes('integrator', 'Edit', { file_path: '/w/tests/acceptance/us-3/run.sh' });
+yes('integrator', 'Write', { file_path: '/w/.gitea/workflows/ci.yml' });
+no('integrator', 'Edit', { file_path: '/w/src/app.ts' });
+no('integrator', 'Bash', { command: 'git merge origin/main' });
+no('integrator', 'Bash', { command: 'git checkout --theirs tests/acceptance/us-3/run.sh' });
+
 // every role: no pushing, fetching, rewriting
-for (const role of ['dev', 'tester', 'retester', 'reviewer']) {
+for (const role of ['dev', 'tester', 'retester', 'reviewer', 'integrator']) {
   yes(role, 'Bash', { command: 'git push origin HEAD' });
   yes(role, 'Bash', { command: 'git fetch' });
   yes(role, 'Bash', { command: 'git commit --amend -m x' });

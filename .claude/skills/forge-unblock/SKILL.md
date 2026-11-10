@@ -17,10 +17,12 @@ Read the issue and all its comments (`./forge-api.sh GET "/repos/$repo/issues/$n
 
 | Reason says | Usually means | Fix |
 |---|---|---|
-| `still rejected after 3 attempts` | the story is ambiguous, too big, or its tests contradict it | sharpen the story's criteria. Splitting it means new `us-todo` issues ending with `Part of #spec` and `Depends on #n`, and closing the original; the spec only tracks the stories of its plan marker, so it may close before the new ones finish |
+| `still rejected after 3 attempts` | the story is ambiguous, too big, or its tests contradict it | sharpen the story's criteria. Splitting it means new `us-todo` issues ending with `Part of #spec` and `Depends on #n`, and closing the original; the spec waits for them before reaching `main` |
 | `the tester changed files outside` / `wrote no acceptance tests` | tester misread the story | make the story's interface and criteria explicit |
 | `orchestrator error` / `no CI result after` | infrastructure: runner down, Gitea or Docker error | `docker compose ps`, `docker compose logs --tail 50 runner orchestrator`; fix, then retry unchanged |
-| `staging deployment failed` | merged, then reverted: the image did not build or `/health` failed | read the build/health error; add the deployment requirement to the story |
+| `staging deployment failed` | merged, then reverted: the image did not build or `/health` failed | read the build/health error; add the deployment requirement to the story. On a spec, add a fixing story (`Part of #spec`), then retry the spec |
+| `` `spec/<n>` could not land `` + `conflicts` (on a spec) | the `integrator` could not reconcile the spec with `main` | see "A spec that conflicts with `main`" below |
+| `` `spec/<n>` could not land `` + `full test suite` or `integrator` (on a spec) | the stories do not work together or with `main`, two tests contradict each other, or a flaky test | read the integrator's summary. Add a fixing story (`Part of #spec`), then retry the spec. A retry starts from a fresh copy of `spec/<n>` and pays for new integrator runs |
 | `invalid plan` / planner failed (on a spec) | spec too vague, or more than 20 stories | sharpen or split the spec |
 | `over budget` (on a spec) | `MAX_COST_PER_SPEC` reached | ask the user before raising it |
 
@@ -29,12 +31,15 @@ Read the issue and all its comments (`./forge-api.sh GET "/repos/$repo/issues/$n
 - Edit a story or spec body: `./forge-api.sh PATCH "/repos/$repo/issues/$n" '{"body": ...}'` (JSON built with `python3` so quotes and newlines survive). Keep the `---`, `Part of #` and `Depends on #` lines at the end of a story.
 - Budget: for one spec, post a comment ending with `<!-- forge:budget=35.00 -->` on it (what the forge UI's budget form does; no restart). For every spec, change `MAX_COST_PER_SPEC` in `.env`, then `docker compose up -d orchestrator` (running stories go back to the queue).
 
+A spec that conflicts with `main`, once the integrator gave up: agents cannot push to `spec/<n>`, and a story's squash merge would not record `main` as merged. Ask the user first, then clone the project, `git checkout -b fix/spec-<n> origin/spec/<n>`, `git merge origin/main`, resolve so both sides keep working, push, open a pull request into `spec/<n>` and merge it with **Create merge commit** (not squash).
+
 ## 3. Retry
 
 Get the label ids from `./forge-api.sh GET "/repos/$repo/labels"`. Remove `us-blocked` (`./forge-api.sh DELETE "/repos/$repo/issues/$n/labels/$BLOCKED_ID"`), then add the label to resume from (`./forge-api.sh POST "/repos/$repo/issues/$n/labels" "{\"labels\": [$ID]}"`):
 
 - a story → `us-todo`: it resumes its branch `agent/us-<n>` when the dev had already worked on it (the tester is skipped and its tests stay frozen), otherwise it starts over from the tester. If CI had failed on the branch, the orchestrator merges `main` into it for a fresh CI run; when `main` has not moved there is nothing to merge, so a retry for a flaky CI failure goes straight to the dev with the old failure (rerun the job in the Gitea UI first, or let `main` move). Delete the branch to force a fresh start (`./forge-api.sh DELETE "/repos/$repo/branches/agent%2Fus-$n"`), e.g. when the tests themselves were wrong;
 - a spec whose planning failed → `spec`: planned again (a failed plan's stories were closed);
-- a spec over budget → `spec-active`, then `us-todo` on each of its blocked stories.
+- a spec over budget → `spec-active`, then `us-todo` on each of its blocked stories;
+- a spec that could not land on `main` → `spec-active`: it tries again from `spec/<n>`, which was kept.
 
 Always remove `us-blocked` first: the orchestrator only swaps the label it expects, so a leftover one stays forever. Report what you changed, and that the forge UI (http://localhost:8000) and `forge-status` show the progress. The UI also has these retry and budget buttons, for the user to use directly.

@@ -26,6 +26,7 @@ type issue struct {
 	Labels []struct {
 		Name string `json:"name"`
 	} `json:"labels"`
+	base string // the branch a story builds on and merges into, set when its pipeline starts
 }
 
 func (is issue) hasLabel(name string) bool {

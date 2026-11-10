@@ -29,6 +29,7 @@ The four agent roles:
 | `architect` | The spec and the code | A design: how the spec fits the app (structure, data model, interfaces, decisions), phases for a big change, and the new `docs/architecture.md` that the reviewer then enforces. Or questions, like the planner |
 | `planner` | The spec and the architect's design | A plan: 1 to 20 stories, with acceptance criteria and build order. Or, for a spec too ambiguous to plan, questions to answer in the spec |
 | `tester` | A story | Failing acceptance tests in `tests/acceptance/us-<n>/` |
+| `integrator` | A finished spec whose full test run fails or conflicts with `main` (up to 3 runs, then the spec blocks) | Fixes on the spec's copy; the orchestrator still decides the merge |
 | `retester` | A story whose dev reported a `TEST CONFLICT:`, or added no commit after a CI failure (up to 3 times per story; then the story blocks at once) | Revised acceptance tests, or its reasons for keeping them |
 | `dev` | The story and its tests | Code that makes the tests pass. It may not touch the tests. |
 | `reviewer` | Spec, story and diff | A criterion → test table, then `VERDICT: approve` or `VERDICT: changes`, with notes |
@@ -60,7 +61,7 @@ flowchart LR
     T --> D["Dev<br/>makes tests pass"]
     D --> C["Checks + CI<br/>frozen tests, CI green"]
     C --> R["Reviewer<br/>approve or changes"]
-    R --> M["Merge + deploy<br/>squash, staging"]
+    R --> M["Merge into spec/n, then<br/>spec into main + deploy"]
     C -->|feedback, retry| D
     R -->|feedback, retry| D
     D -->|after 3 attempts| B["us-blocked<br/>a human looks"]
@@ -78,7 +79,7 @@ Your job is to write good specs and to unblock what stops; everything between th
 2. **Write a spec.** Open an issue labelled `spec` describing the feature: what it does, its interface, and how you would check it. With a spec file, `new-project.sh` opens it for you. The `forge-spec` skill in Claude Code can draft it with you.
 3. **Or write a single story.** For a small change, open an issue labelled `us-todo` with explicit acceptance criteria. It skips planning.
 4. **Follow progress in Gitea.** Each agent run shows one comment, edited live with its latest steps, then replaced by a summary with turns and cost. The spec's plan comment lists the stories in build order.
-5. **Try it on staging.** Once the project has a `Dockerfile`, each merge is deployed to `http://localhost:<9000 + repo id>`; the 🚀 comment gives the URL.
+5. **Try it on staging.** Once the project has a `Dockerfile`, each spec reaching `main` is deployed to `http://localhost:<9000 + repo id>`; the 🚀 comment gives the URL.
 6. **Check status.** The forge UI at http://localhost:8000 shows every project, spec and story, live: each story's pipeline step (Queued, Tests, Code, CI, Review, Merge, Done), its attempt and cost, what its agent is doing right now, and each spec's progress and spend against its budget. It refreshes every 5 seconds. The `forge-status` skill gives the same report in Claude Code.
 7. **Act from the UI.** Its buttons retry a blocked story (resuming its branch) or retry it from scratch (branch and pull request deleted), retry a blocked spec, set one spec's budget, open a new spec, and add a story to a spec (with `priority`, ticked by default, it starts before the other queued stories). Each one asks for confirmation, since it starts paid agent runs. The UI listens on localhost only.
 
@@ -91,8 +92,8 @@ The comments to recognise on an issue:
 | 🔀 Pull request opened | The story's branch is under review |
 | ⏸️ Claude usage limit reached | The agent hit the Claude usage limit; it runs again after the reset, without using an attempt |
 | 🔁 Attempt n/3 | The previous attempt was rejected; the feedback given to the dev follows |
-| 🔄 | `main` moved; the orchestrator merged it into the branch and reruns CI |
-| ✅ / 🚀 | Merged, and deployed to staging |
+| 🔄 | The target branch moved; the orchestrator merged it into the branch and reruns CI |
+| ✅ / 🚀 | Merged into the spec's branch; once on `main`, deployed to staging |
 | ⛔ Blocked | Stopped; the reason and how to resume follow |
 | ♻️ | The story went back to the queue (restart or retry), or resumes its branch |
 
@@ -128,7 +129,7 @@ Mustafar assumes one user and a Gitea reachable on localhost only; outside that,
 
 - **Prompt injection.** An issue body is an instruction to an agent. Anyone who can write issues can steer agents, so keep Gitea private.
 - **Agents can read their Claude credentials.** They run with `bypassPermissions` inside their container.
-- **Shared deploy key.** One key serves every project. An agent could push to any branch except `main` of another project; the orchestrator only merges the commit it checked. The key is removed before Claude starts, and `planner` and `reviewer` never get it back.
+- **Shared deploy key.** One key serves every project. An agent could push to any branch except `main` and `spec/*` of another project; the orchestrator only merges the commit it checked. The key is removed before Claude starts, and `planner` and `reviewer` never get it back.
 - **Docker socket.** The orchestrator holds it to build and run staging, which is root on the host.
 - **Budget blind spot.** A run killed by the 45-minute timeout reports no cost, so it is not counted against the spec budget. Its summary says so.
 - **Restarts lose attempt counts.** Attempts and feedback live in memory: a story in flight goes back to the queue after a restart, then resumes its branch with 3 fresh attempts.

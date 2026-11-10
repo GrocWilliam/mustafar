@@ -78,6 +78,24 @@ func (g *gitea) protect(branch string) error {
 	return g.call("POST", "/branch_protections", map[string]any{"rule_name": branch, "enable_push": false}, nil)
 }
 
+// unprotect removes branch's protection; a rule already gone is not an error.
+func (g *gitea) unprotect(branch string) error {
+	err := g.call("DELETE", "/branch_protections/"+url.PathEscape(branch), nil, nil)
+	if hasStatus(err, http.StatusNotFound) {
+		return nil
+	}
+	return err
+}
+
+// ensureBranch creates branch from another one, unless it exists: two stories of a spec may start together.
+func (g *gitea) ensureBranch(branch, from string) error {
+	err := g.call("POST", "/branches", map[string]string{"new_branch_name": branch, "old_branch_name": from}, nil)
+	if hasStatus(err, http.StatusConflict) {
+		return nil
+	}
+	return err
+}
+
 type repoInfo struct {
 	ID       int64  `json:"id"`
 	FullName string `json:"full_name"`

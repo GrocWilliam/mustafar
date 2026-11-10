@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Stop hook, dev only: before the dev finishes, run what CI runs (templates/ci.yml). A failure keeps the dev working
-# in the same session (exit 2, the reason on stderr), instead of costing a CI round and one of its attempts.
+# Stop hook, dev and integrator: before they finish, run what CI runs (templates/ci.yml). A failure keeps them working
+# in the same session (exit 2, the reason on stderr), instead of costing a CI round and one of their attempts.
 set -uo pipefail
-[ "${ROLE:-}" = dev ] || exit 0
+[ "${ROLE:-}" = dev ] || [ "${ROLE:-}" = integrator ] || exit 0
 cat >/dev/null # the event JSON: nothing in it is needed
 cd "${CLAUDE_PROJECT_DIR:-.}" || exit 0
 
@@ -33,7 +33,12 @@ if make -n build >/dev/null 2>&1; then
   make build >"$log" 2>&1 || fail "\`make build\` fails, as it will in CI."
   export FORGE_PREBUILT=1
 fi
-for script in tests/acceptance/*/run.sh; do
+# As in CI: a story of a spec answers for its own tests, the rest run when the spec is delivered.
+scripts=(tests/acceptance/*/run.sh)
+case "$ROLE:${BASE_BRANCH:-}" in
+  dev:spec/*) scripts=("tests/acceptance/us-${ISSUE_NUMBER}/run.sh") ;;
+esac
+for script in "${scripts[@]}"; do
   [ -e "$script" ] || continue
   bash "$script" >"$log" 2>&1 || fail "the acceptance test \`$script\` fails, as it will in CI."
 done

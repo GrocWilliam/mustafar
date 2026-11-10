@@ -46,7 +46,7 @@ const escape = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 /** Path prefixes, relative to the repository root, the role must not write. */
 function protectedPaths(role, env) {
   const prefixes = (env.PROTECTED_PATHS ?? '.gitea/').split(',').map((p) => p.trim()).filter(Boolean);
-  if (role === 'dev') prefixes.push(ACCEPTANCE);
+  if (role === 'dev' || role === 'integrator') prefixes.push(ACCEPTANCE);
   return prefixes;
 }
 

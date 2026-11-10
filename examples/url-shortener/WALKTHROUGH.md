@@ -36,7 +36,7 @@ Here every story depends on the previous one, so they run one after another; ind
 
 ## 3. Acceptance tests (`tester`) — story #3
 
-#3 moves `us-todo` → `us-in-progress`. The tester starts `agent/us-3` from `main` and commits only under `tests/acceptance/`:
+#3 moves `us-todo` → `us-in-progress`. The tester starts `agent/us-3` from the spec's branch `spec/1` and commits only under `tests/acceptance/`:
 
 ```
 tests/acceptance/us-3/
@@ -72,7 +72,7 @@ The orchestrator posts `🔁 Attempt 2/3. Feedback for the dev agent:` with that
 
 ## 7. Merge
 
-On `VERDICT: approve` with green CI, the orchestrator takes the project's merge lock. If `main` moved meanwhile (another story merged), it first merges `main` into the branch (`🔄 main moved by 1 commit(s)…`) and waits for CI again. Then it squash-merges the pull request, pinned to the commit that was checked: `Shorten a URL with POST /shorten (#3)`.
+On `VERDICT: approve` with green CI, the orchestrator takes the project's merge lock. If `spec/1` moved meanwhile (another story merged), it first merges it into the branch (`🔄 spec/1 moved by 1 commit(s)…`) and waits for CI again. Then it squash-merges the pull request into `spec/1`, pinned to the commit that was checked: `Shorten a URL with POST /shorten (#3)`. Once the spec's last story is closed, `spec/1` goes to `main` the same way, through one pull request.
 
 ## 8. Deployment to staging
 

@@ -42,7 +42,8 @@ The orchestrator is one Go binary, standard library only, that polls Gitea every
 | `pipeline.go` | One story from tester to merge: `deliver`, the dev `attempt` loop, the tester's `revise` on a reported test conflict or a dev stuck after a CI failure (`next`, up to `maxRevisions`), `waitCI` |
 | `resume.go` | A retried story continues its branch when the dev had started, skipping the tester |
 | `checks.go` | Pure merge checks: reviewer verdict, frozen tests, protected paths |
-| `land.go` | Serialized merge: update the branch from `main`, rerun CI, squash-merge, deploy |
+| `land.go` | Serialized merge: update the branch from its target, rerun CI, squash-merge, deploy if the target is `main` |
+| `spec_branch.go` | Each spec's `spec/<n>` branch: target of its stories, delivery to `main` |
 | `deploy.go` | Build and run the staging container, health check, revert |
 | `agent_runner.go` | Starts an agent container and mirrors its stream into one Gitea comment, and into the live activity the UI shows |
 | `ui.go`, `ui.html` | The forge UI on `:8000`: the page, `GET /api/state`, and the actions `POST /api/retry`, `/api/budget`, `/api/spec` |
@@ -72,7 +73,8 @@ Only the orchestrator writes labels; the label is a trace of the state, not a lo
 | `us-review` | closed | Merged and deployed (or no `Dockerfile` yet) |
 | any story label | `us-blocked` | 3 rejections, agent or infrastructure failure, failed deploy, spec over budget |
 | `us-in-progress`, `us-review` | `us-todo` | Orchestrator restart (`recover`) |
-| `spec-active` | closed | Every story in its plan marker is closed |
+| `spec-active` | closed | Every story of the spec is closed, and `spec/<n>` was merged into `main` and deployed |
+| `spec-active` | `us-blocked` | `spec/<n>` conflicts with `main`, CI is red on it, or its deployment failed |
 
 ## Agent container
 
@@ -86,7 +88,7 @@ The orchestrator passes everything through environment variables: `ROLE`, `REPO_
 
 1. Copies `DEPLOY_KEY` into a shell variable, unsets the environment variable, and writes the key to `~/.ssh/id_ed25519` (mode 600).
 2. Clones `REPO_URL` over SSH into `workspace` and sets the git author to `forge-agent-<role>`.
-3. Picks the branch: `planner` stays on `main`; `tester` creates `agent/us-<n>` from `main`; `dev` and `reviewer` check out the tester's branch.
+3. Picks the branch: `planner` stays on `main`; `tester` creates `agent/us-<n>` from its spec's branch `spec/<n>` (from `main` for a story outside any open spec); `dev` and `reviewer` check out the tester's branch.
 4. Deletes the key file. `planner` and `reviewer` also drop the variable, so they can never push.
 5. Builds the task from `/prompts/<role>.md`, the issue title and body, and the feedback from the previous attempt.
 6. Runs `timeout 45m claude -p "$task" --permission-mode bypassPermissions --output-format stream-json --max-turns "${MAX_TURNS:-30}" --verbose`. Stdout carries only Claude's stream; everything else goes to stderr.
@@ -102,7 +104,7 @@ A fifth role, `revert`, runs no Claude: it does `git revert` of a merge whose de
 | --- | --- | --- | --- |
 | `architect` | `main`, read only | Nothing | Nothing: its final message is appended to the spec body the planner gets; a `{"questions": [...]}` block blocks the spec |
 | `planner` | `main`, read only | Nothing | Plan JSON: 1 to 20 stories, keys unique, dependencies on earlier stories only |
-| `tester` | `agent/us-<n>`, new from `main` | `tests/acceptance/` only | Nothing outside that directory; at least one file in `us-<n>/` |
+| `tester` | `agent/us-<n>`, new from its target branch | `tests/acceptance/` only | Nothing outside that directory; at least one file in `us-<n>/` |
 | `dev` | `agent/us-<n>` | Anything but the tester's tests and `PROTECTED_PATHS` | Frozen tests, protected paths, CI |
 | `reviewer` | `agent/us-<n>`, read only | Nothing | Branch head unchanged after its run; last `VERDICT:` line |
 
@@ -138,22 +140,24 @@ After each dev attempt the orchestrator runs fixed checks in order; the first on
 
 1. **Dev result.** A failed run, or one with no new commit, is retried with the agent's own last message as feedback.
 2. **Pull request.** Opened on the first attempt (`Closes #n`); the story moves to `us-review`.
-3. **Frozen tests.** Files the tester wrote must be byte-identical to its commit. Other acceptance files may only match the tester's tree or `main`, which a merge of `main` brings in. Compared by git blob SHA through the Gitea tree API.
+3. **Frozen tests.** Files the tester wrote must be byte-identical to its commit. Other acceptance files may only match the tester's tree or the target branch, which merging it brings in. Compared by git blob SHA through the Gitea tree API.
 4. **Protected paths.** No file under a `PROTECTED_PATHS` prefix may differ from both the base tree and the current `main`.
 5. **CI.** `waitCI` polls the combined commit status of the head SHA every `POLL_SECONDS`, up to 30 minutes. Anything but `success` is a rejection.
 6. **Review.** The reviewer runs; if the branch head moved during its run, the story is blocked. Its last `VERDICT: approve` or `VERDICT: changes` line decides; no verdict counts as changes.
 
 ### The CI workflow
 
-Each project carries `.gitea/workflows/ci.yml`, copied from `templates/ci.yml` and protected by `PROTECTED_PATHS`. It runs on `pull_request`: `make test`, then the `tests/acceptance/*/run.sh` scripts from a fresh checkout, so the dev's `Makefile` can neither skip nor rewrite them, split round-robin across 3 parallel shard jobs. Each shard runs `make build` once when that target exists and sets `FORGE_PREBUILT=1`, so scripts skip their own build. Jobs run in the local `forge-ci` image, which ships Chromium and `playwright-core` (`$PLAYWRIGHT_DIR`) for browser tests, on the `forge` network, without the Docker socket. Their outgoing connections use ports 40000 and up (`runner/config.yaml`), so a test server below that never collides with its own `/health` checks.
+Each project carries `.gitea/workflows/ci.yml`, copied from `templates/ci.yml` and protected by `PROTECTED_PATHS`. It runs on `pull_request`: `make test`, then the `tests/acceptance/*/run.sh` scripts from a fresh checkout, so the dev's `Makefile` can neither skip nor rewrite them, split round-robin across 3 parallel shard jobs. A story of a spec runs only its own `tests/acceptance/us-<n>/run.sh`; a spec's delivery to `main`, and a story going straight to `main`, run them all. Each shard with scripts runs `make build` once when that target exists and sets `FORGE_PREBUILT=1`, so scripts skip their own build. Jobs run in the local `forge-ci` image, which ships Chromium and `playwright-core` (`$PLAYWRIGHT_DIR`) for browser tests, on the `forge` network, without the Docker socket. Their outgoing connections use ports 40000 and up (`runner/config.yaml`), so a test server below that never collides with its own `/health` checks.
 
 ### Merge (`land.go`)
 
-Merges take the project's merge mutex, so stories that finish together merge one after the other.
+A story of an open spec merges into `spec/<n>`, created from `main` when the spec's first story starts; a story outside any open spec merges into `main`. Merges take the project's merge mutex, so stories that finish together merge one after the other.
 
-1. If the branch is behind `main`, the orchestrator updates the pull request from `main` and reruns CI. A conflict, or red CI after the update, becomes dev feedback.
+1. If the branch is behind its target, the orchestrator updates the pull request from it and reruns CI. A conflict, or red CI after the update, becomes dev feedback.
 2. It squash-merges with `head_commit_id` pinned to the head that passed review, so a later push cannot slip in.
-3. It deploys the new `main` while still holding the lock.
+3. If the target is `main`, it deploys the new `main` while still holding the lock.
+
+When every story of a spec is closed (those added after the plan too), `landSpec` takes an agent slot, copies `spec/<n>` to `agent/spec-<n>` and opens a pull request to `main`, on which CI runs every acceptance test. It applies the same three steps once CI is green. Each spec is one squashed commit on `main`. A red suite or a conflict starts the `integrator` agent on `agent/spec-<n>`, up to 3 runs, then blocks the spec; a run that changes a frozen or protected file blocks it at once. After the deployment passes, `spec/<n>` and its protection rule are deleted; until then they stay for the retry, which starts over from a fresh copy.
 
 ### Staging deploy (`deploy.go`)
 
@@ -162,7 +166,7 @@ Merges take the project's merge mutex, so stories that finish together merge one
 3. It replaces the container `forge-staging-<owner>-<repo>` (restart `unless-stopped`), port 8080 published on `127.0.0.1:<9000 + repo id>`.
 4. `GET /health` must answer 200 within one minute.
 
-On failure, `rollback` starts a `revert` agent container, merges its `revert/<sha>` branch through a pull request, redeploys the previous `main` (or removes the container if there was no `Dockerfile`), reopens the story and blocks it. Deployed images are never pruned.
+On failure, `rollback` starts a `revert` agent container, merges its `revert/<sha>` branch through a pull request, redeploys the previous `main` (or removes the container if there was no `Dockerfile`), reopens the story or spec and blocks it. Deployed images are never pruned.
 
 ## Budget, recovery and configuration
 
@@ -221,6 +225,7 @@ The design keeps every secret that can change `main` or the host out of agent co
 | --- | --- | --- |
 | `GITEA_TOKEN` | Orchestrator only | Never passed to containers; agents push over SSH |
 | Push to `main` | Nobody | Branch protection with `enable_push: false`, set on startup; only API merges reach `main` |
+| Push to `spec/<n>` | Nobody | Same protection as `main`, set when the branch is created; only API merges reach it |
 | Deploy key | Agents, for git | Removed from disk before Claude starts; `planner` and `reviewer` never get it back |
 | Docker socket | Orchestrator, runner daemon | CI jobs run with `docker_host: "-"`; deployment is done by the orchestrator, never by a CI job |
 | CI definition | Protected path `.gitea/` | A pull request touching it is rejected, never merged |
@@ -233,7 +238,7 @@ Accepted risks:
 - The Docker socket in the orchestrator is root on the host; mounting it read-only changes nothing.
 - An agent in `bypassPermissions` can read its Claude credentials.
 - An issue body is an instruction to an agent, so anyone who can write issues can inject prompts.
-- The deploy key is shared by all projects. A `tester` or `dev` agent could still read it from its parent shell's memory and push to any branch except `main` of another project.
+- The deploy key is shared by all projects. A `tester` or `dev` agent could still read it from its parent shell's memory and push to any branch except `main` and `spec/*` of another project.
 
 ## Operations
 

@@ -63,7 +63,7 @@ func newFakeForge(t *testing.T, f *fakes) *project {
 	os.WriteFile(key, []byte("key"), 0o600)
 
 	cfg := config{GiteaURL: gitea.URL, GiteaToken: "t", DeployKeyFile: key}
-	fg := &forge{cfg: cfg, docker: newDocker(listener.Addr().String()), running: map[string]bool{}}
+	fg := &forge{cfg: cfg, docker: newDocker(listener.Addr().String()), running: map[string]bool{}, activity: map[string]*agentActivity{}}
 	p := newProject(fg, repoInfo{ID: 1, FullName: "o/r"})
 	p.base = "main"
 	return p
@@ -98,7 +98,7 @@ func TestLandRollsBackFailedDeploy(t *testing.T) {
 	}
 	p := newFakeForge(t, f)
 
-	_, err := p.land(issue{Number: 1, Title: "Feature"}, &pullRequest{Number: 5}, "agent/us-1", "h")
+	_, err := p.land(issue{Number: 1, Title: "Feature", base: "main"}, &pullRequest{Number: 5}, "agent/us-1", "h")
 	if err == nil || !strings.Contains(err.Error(), "The merge was reverted on main") {
 		t.Fatalf("land error = %v", err)
 	}

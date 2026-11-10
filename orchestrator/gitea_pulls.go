@@ -18,6 +18,9 @@ type pullRequest struct {
 		Ref string `json:"ref"`
 		SHA string `json:"sha"`
 	} `json:"head"`
+	Base struct {
+		Ref string `json:"ref"`
+	} `json:"base"`
 }
 
 // findPR returns the open pull request from branch, or nil when there is none.
@@ -164,6 +167,11 @@ func (g *gitea) updatePR(pr int) error {
 		return errConflict
 	}
 	return err
+}
+
+// retarget makes pr merge into base.
+func (g *gitea) retarget(pr int, base string) error {
+	return g.call("PATCH", fmt.Sprintf("/pulls/%d", pr), map[string]string{"base": base}, nil)
 }
 
 func (g *gitea) closePR(number int) error {
