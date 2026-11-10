@@ -29,7 +29,7 @@ make build    # if the app has a build step
 
 ## Skills
 
-The forge's defaults are the `stack-ui`, `stack-api`, `stack-db`, `stack-tests`, `stack-i18n` and `stack-security` skills. Where this
+The forge's defaults are the `stack-ui`, `stack-api`, `stack-db`, `stack-tests`, `stack-debug`, `stack-i18n` and `stack-security` skills. Where this
 project differs, say so here; project-specific how-tos go in `.claude/skills/`.
 
 ## Pitfalls

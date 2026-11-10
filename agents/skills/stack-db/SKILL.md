@@ -39,7 +39,8 @@ import { Pool } from 'pg';
 
 1. Edit `schema.ts` (`pgTable`). Conventions: `id: text().primaryKey().$defaultFn(() => crypto.randomUUID())`,
    `createdAt: timestamp({ withTimezone: true }).notNull().defaultNow()`, foreign keys with
-   `.references(() => parent.id, { onDelete: 'cascade' })`, indexes in the table's third argument.
+   `.references(() => parent.id, { onDelete: 'cascade' })`, indexes in the table's third argument. PostgreSQL does not
+   index a foreign key's column: add an index when queries filter or join on it, or when deleting the parent cascades.
 2. `npx drizzle-kit generate --name short_name` and commit everything it writes under `drizzle/` (SQL and `meta/`).
    It needs no database. If it asks about a rename, you are headless: avoid renames (add the new column, migrate
    the data, drop the old one in a later story).
@@ -48,6 +49,8 @@ import { Pool } from 'pg';
 
 ## Queries
 
+- Before writing relations, read the `drizzle-orm` version in `package.json` and the lockfile, not an npm tag: 0.x uses
+  `relations()`, v1 uses `defineRelations()`. Never mix them.
 - Use the query builder or `db.query.<table>` with typed results; `sql` template only for what the builder cannot
   express (it parameterizes; never build SQL strings by concatenation).
 - One statement with `.returning()` beats read-then-write; multi-step writes go in `db.transaction(async (tx) => ...)`.

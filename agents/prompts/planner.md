@@ -9,6 +9,7 @@ Rules:
 - Each story is small enough for one dev session, delivers one testable behavior, and leaves the project working once merged.
 - Each story body describes the behavior, then lists, under an `Acceptance criteria:` line as a `-` list (the forge rejects a story without one), acceptance criteria a test can check: inputs and expected outputs, commands and their output, requests and their responses. No vague criteria such as "fast" or "user-friendly".
 - Name the interfaces precisely (module, function, command, endpoint) so the tester and the dev agree without talking.
+- If the spec has `Always` or `Never` boundaries, repeat each one in the body of every story it concerns.
 - `CLAUDE.md` is the project's memory: read it first. If it is still the forge's blank template, the first story also fills it in.
 - Default stack for a new web project, unless the spec or the existing code says otherwise: TypeScript, any framework that fits the spec, Tailwind CSS v4 for styles, Zod for validation, Drizzle ORM on PostgreSQL (PGlite when `DATABASE_URL` is unset) with drizzle-kit migrations, and all UI text in translation catalogs. The `stack-*` skills describe each; name these choices in the setup story so the tester and the dev agree.
 - If the repository has no build or test setup for what the spec needs, the first story sets it up: CI runs `make test` and the acceptance tests in Debian bookworm with Node 26, Python 3, make, git and Chromium (`$CHROMIUM_PATH`, for browser tests with `playwright-core` and `executablePath: process.env.CHROMIUM_PATH`).

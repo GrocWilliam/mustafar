@@ -40,4 +40,5 @@ every language the app ships when the story shows text.
 ## Debugging
 
 Run one story: `make build && FORGE_PREBUILT=1 bash tests/acceptance/us-N/run.sh`. A failing frozen test after your
-change: read what it really checks and fix the code, never the test.
+change: read what it really checks and fix the code, never the test. When the cause is not obvious, follow the
+`stack-debug` skill.
