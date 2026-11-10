@@ -84,6 +84,30 @@ func progressOf(comments []string, state string, labels []string) storyProgress 
 	return p
 }
 
+// specSteps are the steps a spec goes through once its stories are done; deliveryOf returns an index into it.
+var specSteps = []string{"Stories", "All tests", "Merge", "Done"}
+
+// deliveryOf reads how far a spec's landing on main got from its comments (oldest first): 0 until it starts,
+// and the integrator runs of the current delivery.
+func deliveryOf(comments []string, state string) (step, fixes int) {
+	for _, c := range comments {
+		switch {
+		case strings.HasPrefix(c, "🔀 All stories are merged"):
+			step, fixes = 1, 0 // a retry starts a fresh delivery
+		case strings.HasPrefix(c, "🔁 Integrator run"):
+			step, fixes = 1, fixes+1
+		case strings.HasPrefix(c, "🔄"):
+			step = 2
+		case strings.HasPrefix(c, "✅ CI green"):
+			step = 3
+		}
+	}
+	if state == "closed" {
+		step = len(specSteps) - 1
+	}
+	return step, fixes
+}
+
 // commentCache keeps the comments the UI reads, keyed by `owner/repo#n` and the issue's updated_at,
 // which Gitea bumps on every new comment. Comments of open issues expire anyway: agents edit theirs.
 type commentCache struct {
@@ -168,6 +192,9 @@ type uiSpec struct {
 	Budget  float64        `json:"budget"`
 	Done    int            `json:"done"`
 	Stories []uiStory      `json:"stories"`
+	// Delivery is the spec's step in specSteps once its stories are done, Fixes the integrator runs it took.
+	Delivery int `json:"delivery"`
+	Fixes    int `json:"fixes"`
 }
 
 type uiProject struct {
@@ -275,6 +302,7 @@ func (o *project) uiProject(activity map[string]agentActivity) (uiProject, error
 		}
 		spec := uiSpec{Number: is.Number, Title: is.Title, URL: up.URL + fmt.Sprintf("/issues/%d", is.Number), State: is.State,
 			Cost: sumCosts(specComments), Budget: specBudget(specComments, o.settings().MaxCostPerSpec), Agent: agent(is.Number), Stories: []uiStory{}}
+		spec.Delivery, spec.Fixes = deliveryOf(specComments, is.State)
 		switch {
 		case is.State == "closed":
 			spec.Phase = "done"

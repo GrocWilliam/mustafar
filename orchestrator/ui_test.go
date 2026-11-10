@@ -39,6 +39,29 @@ func TestProgressOf(t *testing.T) {
 	}
 }
 
+func TestDeliveryOf(t *testing.T) {
+	started := "🔀 All stories are merged, running every acceptance test before `main`: x"
+	cases := []struct {
+		name        string
+		comments    []string
+		state       string
+		step, fixes int
+	}{
+		{"stories running", []string{"📋 Plan"}, "open", 0, 0},
+		{"full suite", []string{"📋 Plan", started}, "open", 1, 0},
+		{"integrator", []string{started, "🔁 Integrator run 1/3, for:", "🔁 Integrator run 2/3, for:"}, "open", 1, 2},
+		{"main moved", []string{started, "🔄 `main` moved by 2 commit(s)"}, "open", 2, 0},
+		{"retried: fresh delivery", []string{started, "🔁 Integrator run 1/3", "⛔ Blocked: x", "🔁 Retried from the forge UI", started}, "open", 1, 0},
+		{"merged", []string{started, "✅ CI green and review approved"}, "open", 3, 0},
+		{"closed", []string{"📋 Plan"}, "closed", 3, 0},
+	}
+	for _, c := range cases {
+		if step, fixes := deliveryOf(c.comments, c.state); step != c.step || fixes != c.fixes {
+			t.Errorf("%s: deliveryOf = %d, %d, want %d, %d", c.name, step, fixes, c.step, c.fixes)
+		}
+	}
+}
+
 func TestSpecBudget(t *testing.T) {
 	comments := []string{"📋 Plan", "💰 Budget set to $30.00 " + budgetMarkerFor(30), "💰 " + budgetMarkerFor(45.5), "🤖 cost <!-- forge:cost=1.2 -->"}
 	if got := specBudget(comments, 20); got != 45.5 {

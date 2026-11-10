@@ -120,6 +120,7 @@ table.mirrors td.addr { overflow-wrap: anywhere; }
 <script>
 "use strict";
 const STEPS = ["Queued", "Tests", "Code", "CI", "Review", "Merge", "Done"];
+const SPEC_STEPS = ["Stories", "All tests", "Merge", "Done"]; // a spec's landing on main, once its stories are done
 const REFRESH_MS = 5000;
 const app = document.getElementById("app");
 const open = new Set(); // keys of <details> the user opened, kept across refreshes
@@ -139,11 +140,11 @@ function agentBox(a) {
     ${a.waiting ? `<div class="meta">⏸️ ${esc(a.waiting)}</div>` : ""}${steps ? `<ol start="${Math.max(1, (a.total || 0) - (a.steps || []).length + 1)}">${steps}</ol>` : ""}</div>`;
 }
 
-function stepsBar(st) {
-  return `<div class="steps" role="img" aria-label="Step ${st.step + 1} of ${STEPS.length}: ${STEPS[st.step]}${st.blocked ? ", blocked" : ""}">` +
-    STEPS.map((name, i) => {
+function stepsBar(st, steps = STEPS) {
+  return `<div class="steps" style="grid-template-columns: repeat(${steps.length}, minmax(0, 1fr))" role="img" aria-label="Step ${st.step + 1} of ${steps.length}: ${steps[st.step]}${st.blocked ? ", blocked" : ""}">` +
+    steps.map((name, i) => {
       let cls = i < st.step ? "done" : i === st.step ? "current" : "";
-      if (i === st.step && st.step === STEPS.length - 1) cls = "done current";
+      if (i === st.step && st.step === steps.length - 1) cls = "done current";
       if (i === st.step && st.blocked) cls += " blocked";
       if (i === st.step && st.agent) cls += " live";
       return `<span class="step ${cls}">${name}</span>`;
@@ -185,6 +186,8 @@ function specCard(p, s) {
       <div class="meter">Spend: ${money(s.cost)} of ${money(s.budget)}${over ? " — over budget" : ""}
         <div class="bar cost${over ? " over" : ""}"><span style="width:${Math.min(100, (100 * s.cost) / (s.budget || 1))}%"></span></div></div>
     </div>
+    ${s.phase !== "done" && s.delivery > 0 ? `<div class="story-line"><span class="story-title meta">Landing on main${s.fixes ? ` · integrator run ${s.fixes}/3` : ""}</span>
+      ${stepsBar({ step: s.delivery, blocked: s.blocked, agent: s.agent }, SPEC_STEPS)}</div>` : ""}
     ${agentBox(s.agent)}${blocked}
     ${s.phase === "done" ? "" : `<details data-key="${esc(key)}"${open.has(key) ? " open" : ""}><summary>Change budget</summary>
       <form class="inline" data-act="budget" data-project="${esc(p.name)}" data-number="${s.number}">
