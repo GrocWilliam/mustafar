@@ -81,7 +81,7 @@ Open an issue with explicit acceptance criteria and the `us-todo` label (e.g. in
 
 Rejections show up as `🔁 Attempt n/3` comments with the feedback given to the dev. After 3 attempts the issue moves to `us-blocked`. If its target branch moved under a finished story, a `🔄` comment shows the orchestrator merging it into the branch and rerunning CI first.
 
-Stories merge into their spec's own branch, `spec/<n>`, so specs built in parallel do not collide, and each story runs only its own acceptance tests. Once its last story is closed, every acceptance test runs on the whole spec. If that fails or conflicts with `main`, an `integrator` agent fixes it, then the orchestrator merges the spec into `main` through one pull request.
+Stories merge into their spec's own branch, `spec/<n>`, so specs built in parallel do not collide. Each story runs every acceptance test, so an earlier test it breaks shows up on that story: its tester updates the test when the story changes that behavior on purpose, and the dev fixes the code otherwise. Once its last story is closed, every acceptance test runs again on the whole spec. If that fails or conflicts with `main`, an `integrator` agent fixes it, then the orchestrator merges the spec into `main` through one pull request.
 
 ### Staging
 

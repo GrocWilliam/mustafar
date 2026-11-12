@@ -33,7 +33,7 @@ if make -n build >/dev/null 2>&1; then
   make build >"$log" 2>&1 || fail "\`make build\` fails, as it will in CI."
   export FORGE_PREBUILT=1
 fi
-# As in CI: a story of a spec answers for its own tests, the rest run when the spec is delivered.
+# A story of a spec checks only its own tests here (the whole suite would outlast the hook timeout); CI runs them all.
 scripts=(tests/acceptance/*/run.sh)
 case "$ROLE:${BASE_BRANCH:-}" in
   dev:spec/*) scripts=("tests/acceptance/us-${ISSUE_NUMBER}/run.sh") ;;

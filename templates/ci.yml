@@ -22,18 +22,11 @@ jobs:
       - uses: actions/checkout@v4
       - name: acceptance tests (frozen, written by the tester agent)
         shell: bash
-        env: # through the environment: branch names must never be pasted into the script
-          HEAD_REF: ${{ github.head_ref }}
-          BASE_REF: ${{ github.base_ref }}
         run: |
-          # A story of a spec answers for its own tests; a spec reaching main, or a story going straight to it, for all of them.
-          pattern='tests/acceptance/*/run.sh'
-          case "$BASE_REF:$HEAD_REF" in
-            spec/*:agent/us-*) pattern="tests/acceptance/us-${HEAD_REF#agent/us-}/run.sh" ;;
-          esac
+          # Every story runs every test, so an earlier test it breaks shows up on that story, where its tester can update it.
           scripts=()
           i=0
-          for script in $pattern; do
+          for script in tests/acceptance/*/run.sh; do
             [ -e "$script" ] || continue
             [ $((i++ % 3)) -eq ${{ matrix.shard }} ] || continue
             scripts+=("$script")
