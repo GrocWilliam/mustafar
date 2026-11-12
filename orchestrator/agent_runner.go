@@ -141,7 +141,9 @@ func (o *project) runAgent(role string, is issue, feedback string) (bool, string
 
 // maxTurns is an agent run's turn cap. The tester's grows with the story: a big one has many criteria and frozen tests to read.
 func maxTurns(role, complexity string) int {
-	if role == "integrator" { // it reads several stories' work, and runs the whole suite
+	// The integrator reads several stories' work and runs the whole suite; the planner reads every acceptance test a
+	// spec may supersede, over a hundred folders in a grown project.
+	if role == "integrator" || role == "planner" {
 		return 60
 	}
 	if role != "tester" {

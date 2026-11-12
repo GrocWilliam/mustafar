@@ -117,7 +117,7 @@ func TestMaxTurns(t *testing.T) {
 	for _, c := range []struct {
 		role, complexity string
 		want             int
-	}{{"tester", "low", 30}, {"tester", "", 45}, {"tester", "medium", 45}, {"tester", "high", 60}, {"dev", "high", 30}, {"planner", "high", 30}} {
+	}{{"tester", "low", 30}, {"tester", "", 45}, {"tester", "medium", 45}, {"tester", "high", 60}, {"dev", "high", 30}, {"planner", "", 60}, {"architect", "", 30}} {
 		if got := maxTurns(c.role, c.complexity); got != c.want {
 			t.Errorf("maxTurns(%q, %q) = %d, want %d", c.role, c.complexity, got, c.want)
 		}
