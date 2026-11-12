@@ -124,6 +124,7 @@ Once a project has a `Dockerfile` (the planner adds one when a spec describes a 
 Available in any Claude Code session opened in this directory (`.claude/skills/`):
 
 - `forge-setup`: install, start, rebuild after changes
+- `forge-prd`: start a new project from an idea: a guided interview that writes its PRD, architecture and design docs, then opens its first spec
 - `forge-spec`: write a spec and open it, creating the project if needed
 - `forge-status`: projects, running work, blocked issues, spend
 - `forge-unblock`: diagnose and retry a blocked story or spec

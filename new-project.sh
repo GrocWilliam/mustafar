@@ -1,13 +1,16 @@
 #!/usr/bin/env bash
 # Create a forge project: Gitea repo, agents' deploy key, protected CI workflow, `forge` topic.
 # With a spec file (first line `# Title`, then the body), also open it as a `spec` issue once the orchestrator is ready.
-# Usage: ./new-project.sh NAME [SPEC_FILE]
+# With a docs directory (the forge-prd skill's prd.md, architecture.md, ui.md), commit its files under docs/.
+# Usage: ./new-project.sh NAME [SPEC_FILE] [DOCS_DIR]
 set -euo pipefail
 cd "$(dirname "$0")"
 
-name=${1:?usage: $0 NAME [SPEC_FILE]}
+name=${1:?usage: $0 NAME [SPEC_FILE] [DOCS_DIR]}
 spec=${2:-}
+docs=${3:-}
 [ -z "$spec" ] || [ -f "$spec" ] || { echo "no such spec file: $spec" >&2; exit 1; }
+[ -z "$docs" ] || [ -d "$docs" ] || { echo "no such docs directory: $docs" >&2; exit 1; }
 owner=forge
 repo="/repos/$owner/$name"
 
@@ -25,6 +28,10 @@ api POST "$repo/contents/.gitea/workflows/ci.yml" \
   "{\"message\": \"ci: add workflow\", \"content\": \"$(base64 -w0 templates/ci.yml)\"}" >/dev/null
 api POST "$repo/contents/CLAUDE.md" \
   "{\"message\": \"docs: add the agents' CLAUDE.md\", \"content\": \"$(base64 -w0 templates/CLAUDE.md)\"}" >/dev/null
+for f in ${docs:+"$docs"/*.md}; do
+  api POST "$repo/contents/docs/$(basename "$f")" \
+    "{\"message\": \"docs: add $(basename "$f")\", \"content\": \"$(base64 -w0 "$f")\"}" >/dev/null
+done
 api PUT "$repo/topics/forge" >/dev/null
 echo "created http://localhost:3000/$owner/$name"
 [ -n "$spec" ] || exit 0

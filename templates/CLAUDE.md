@@ -13,6 +13,8 @@ _Language, framework, database, test framework, and the versions that matter._
 
 ## Layout
 
+_`docs/prd.md` (product), `docs/architecture.md` (structure, enforced by the reviewer) and `docs/ui.md` (design), when they exist, are the references; link them here._
+
 _Where each kind of code lives, one line per folder or key file._
 
 ## Conventions

@@ -13,6 +13,8 @@ API calls go through `./forge-api.sh METHOD PATH [JSON | @file]` (prints the bod
 
 ## 1. Settle what to build
 
+A new project with no settled product, stack or design: use `forge-prd` first; it writes the project's reference docs, then comes back here for each spec. A project with `docs/prd.md` or `docs/architecture.md`: read them and write the spec within them.
+
 Runs are paid and nobody answers the agents, so settle decisions here. For an existing project, read its code first and never ask what it already answers. Skip what the request already settles.
 
 **Scope.** When the request bundles capabilities that have their own users or data and can be tested separately, propose a capability map and get it agreed before writing: a table of modules (kebab-case id, responsibility, depends on), dependencies in one direction with no cycles, and the build order. Each module becomes its own spec, opened in build order and linked with `Depends on #N`.
