@@ -11,6 +11,8 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 const ACCEPTANCE = 'tests/acceptance/';
+// The tests' shared domain layer: not frozen, a UI change updates it once (orchestrator: supportDir).
+const SUPPORT = ACCEPTANCE + 'support/';
 const WRITE_TOOLS = new Set(['Write', 'Edit', 'MultiEdit', 'NotebookEdit']);
 // Git commands no role may run: the orchestrator pushes, and owns branches and history.
 const GIT_FORBIDDEN = /\bgit\s+(?:-\S+\s+)*(push|fetch|remote|rebase|switch|filter-branch|filter-repo)\b|\bgit\s+commit\b.*--amend/;
@@ -75,14 +77,15 @@ export function check(event, role, env = process.env) {
       if (role === 'planner' || role === 'architect' || role === 'reviewer') return `the ${role} only reads: do not modify ${rel}.`;
       if ((role === 'tester' || role === 'retester') && !rel.startsWith(ACCEPTANCE)) return `the ${role} writes only under ${ACCEPTANCE}: ${rel} is outside it.`;
       for (const prefix of protectedPaths(role, env)) {
-        if (rel.startsWith(prefix)) return frozenReason(rel, prefix);
+        if (rel.startsWith(prefix) && !(prefix === ACCEPTANCE && rel.startsWith(SUPPORT))) return frozenReason(rel, prefix);
       }
     }
   } else if (tool === 'Bash') {
     const command = args.command ?? '';
     if (GIT_FORBIDDEN.test(command)) return 'do not push, fetch, switch branches, rewrite history or touch remotes: the forge does that.';
     for (const prefix of protectedPaths(role, env)) {
-      if (new RegExp(SHELL_WRITE + String.raw`\b` + escape(prefix.replace(/\/$/, ''))).test(command)) return frozenReason(prefix, prefix);
+      const exempt = prefix === ACCEPTANCE ? String.raw`(?!/support/(?!\.\./))` : '';
+      if (new RegExp(SHELL_WRITE + String.raw`\b` + escape(prefix.replace(/\/$/, '')) + exempt).test(command)) return frozenReason(prefix, prefix);
     }
   }
   return null;

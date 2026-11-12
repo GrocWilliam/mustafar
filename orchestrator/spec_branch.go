@@ -195,7 +195,7 @@ func (o *project) integrate(spec issue, branch, work, problem string) error {
 		return err
 	}
 	for _, prefix := range append([]string{acceptanceDir}, o.cfg.Protected...) {
-		if touched := drifted(after, prefix, before, specTree, mainTree); len(touched) > 0 {
+		if touched := outside(drifted(after, prefix, before, specTree, mainTree), supportDir); len(touched) > 0 {
 			return fmt.Errorf("the integrator changed frozen or protected files: %s", list(touched))
 		}
 	}

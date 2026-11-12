@@ -14,6 +14,10 @@ const (
 	maxRevisions  = 3 // tester revisions per story: a story that moves things can break several earlier tests in turn
 	ciTimeout     = 30 * time.Minute
 	acceptanceDir = "tests/acceptance/"
+	// supportDir holds the acceptance tests' shared domain layer (page objects, API setup): not frozen, so a UI change
+	// updates it once instead of every test. shortcut: the reviewer alone checks a support change keeps each action's
+	// meaning; diff the support layer against the frozen tests' expectations if devs ever weaken tests through it.
+	supportDir = acceptanceDir + "support/"
 )
 
 // contract is what a story's checks compare against: the tree the tester started from, and the tree holding its

@@ -52,6 +52,7 @@ func TestFrozen(t *testing.T) {
 		"main merged in":       {map[string]string{"tests/acceptance/us-7/run.sh": "en-es-fr", "tests/acceptance/us-9/run.sh": "es", "tests/acceptance/us-8/run.sh": "err"}, nil},
 		"tester update undone": {map[string]string{"tests/acceptance/us-7/run.sh": "en-fr", "tests/acceptance/us-9/run.sh": "es"}, []string{"tests/acceptance/us-7/run.sh"}},
 		"own test deleted":     {map[string]string{"tests/acceptance/us-7/run.sh": "en-es-fr"}, []string{"tests/acceptance/us-9/run.sh"}},
+		"support layer edited": {map[string]string{"tests/acceptance/us-7/run.sh": "en-es-fr", "tests/acceptance/us-9/run.sh": "es", "tests/acceptance/support/sheet.mjs": "x"}, nil},
 		"new test file":        {map[string]string{"tests/acceptance/us-7/run.sh": "en-es-fr", "tests/acceptance/us-9/run.sh": "es", "tests/acceptance/us-9/skip.py": "x"}, []string{"tests/acceptance/us-9/skip.py"}},
 	}
 	for name, c := range cases {

@@ -57,7 +57,7 @@ func drifted(head map[string]string, prefix string, allowed ...map[string]string
 	return paths
 }
 
-// frozen lists the acceptance test files the dev changed. Files the tester wrote or rewrote must stay exactly as it
+// frozen lists the acceptance test files the dev changed, leaving out the shared support layer. Files the tester wrote or rewrote must stay exactly as it
 // committed them, unless main changed them too: a merge of main then holds both edits. The other ones may also
 // match main, which a merge of main into the branch brings in.
 func frozen(base, tester, main, head map[string]string) []string {
@@ -77,7 +77,7 @@ func frozen(base, tester, main, head map[string]string) []string {
 		}
 	}
 	sort.Strings(touched)
-	return touched
+	return outside(touched, supportDir)
 }
 
 // outside keeps the paths that are not under prefix.

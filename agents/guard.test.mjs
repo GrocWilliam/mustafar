@@ -17,6 +17,11 @@ no('dev', 'Write', { file_path: '/w/src/app.ts' });
 no('dev', 'Write', { file_path: '/tmp/scratch.txt' });
 no('dev', 'Write', { file_path: '/w/tests/unit/app.test.ts' });
 
+// dev and integrator: the support layer is not frozen
+no('dev', 'Edit', { file_path: '/w/tests/acceptance/support/sheet.mjs' });
+no('integrator', 'Write', { file_path: 'tests/acceptance/support/api.mjs' });
+no('dev', 'Bash', { command: "sed -i 's/gold/coins/' tests/acceptance/support/sheet.mjs" });
+yes('dev', 'Bash', { command: "sed -i 's/3/4/' tests/acceptance/support/../us-3/test.js" });
 // dev, Bash: writes into frozen tests, not reads or runs
 yes('dev', 'Bash', { command: "sed -i 's/3/4/' tests/acceptance/us-3/test.js" });
 yes('dev', 'Bash', { command: 'rm -rf tests/acceptance/us-3' });
