@@ -12,7 +12,7 @@ import (
 const (
 	maxAttempts   = 3
 	maxRevisions  = 3 // tester revisions per story: a story that moves things can break several earlier tests in turn
-	ciTimeout     = 30 * time.Minute
+	ciTimeout     = 90 * time.Minute // a busy runner queues jobs: a story waits for its 7 jobs behind other stories' ones
 	acceptanceDir = "tests/acceptance/"
 	// supportDir holds the acceptance tests' shared domain layer (page objects, API setup): not frozen, so a UI change
 	// updates it once instead of every test. shortcut: the reviewer alone checks a support change keeps each action's

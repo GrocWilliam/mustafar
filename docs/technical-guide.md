@@ -142,7 +142,7 @@ After each dev attempt the orchestrator runs fixed checks in order; the first on
 2. **Pull request.** Opened on the first attempt (`Closes #n`); the story moves to `us-review`.
 3. **Frozen tests.** Files the tester wrote must be byte-identical to its commit. Other acceptance files may only match the tester's tree or the target branch, which merging it brings in. Compared by git blob SHA through the Gitea tree API.
 4. **Protected paths.** No file under a `PROTECTED_PATHS` prefix may differ from both the base tree and the current `main`.
-5. **CI.** `waitCI` polls the combined commit status of the head SHA every `POLL_SECONDS`, up to 30 minutes. Anything but `success` is a rejection.
+5. **CI.** `waitCI` polls the combined commit status of the head SHA every `POLL_SECONDS`, up to 90 minutes. Anything but `success` is a rejection.
 6. **Review.** The reviewer runs; if the branch head moved during its run, the story is blocked. Its last `VERDICT: approve` or `VERDICT: changes` line decides; no verdict counts as changes.
 
 ### The CI workflow
@@ -215,7 +215,7 @@ There is deliberately no timeout-based requeue: a slow agent must not be duplica
 | `AGENT_IMAGE`, `AGENT_NETWORK` | `forge-agent`, `forge` | Agent image and network |
 | `DEPLOY_KEY_FILE` | `/run/secrets/deploy_key` | Private key mounted into the orchestrator |
 
-Hard-coded limits: 3 dev attempts, 20 stories per plan, 30 turns per agent run (tester: 30/45/60 by story complexity), 45 minutes per agent run, 30 minutes for CI, 1 minute for `/health`.
+Hard-coded limits: 3 dev attempts, 20 stories per plan, 30 turns per agent run (tester: 30/45/60 by story complexity), 45 minutes per agent run, 90 minutes for CI, 1 minute for `/health`.
 
 ## Security model
 
@@ -269,7 +269,7 @@ Unit tests cover the pure parts: stream parsing and summaries (`agent_runner_tes
 | Symptom | Likely cause | Fix |
 | --- | --- | --- |
 | `protecting main: ... 403` in the logs | Token cannot create branch protection | Regenerate `GITEA_TOKEN` with more rights |
-| Story blocked: `no CI result after 30m` | Runner down or not registered | `docker compose up -d runner`; it can lose a race with Gitea at boot |
+| Story blocked: `no CI result after 1h30m0s` | Runner down or not registered, or overloaded (load far above `nproc`: too many stories in parallel) | `docker compose up -d runner`; it can lose a race with Gitea at boot. Overloaded: lower `MAX_AGENTS` |
 | Stories wait while slots are free | Dependencies still open, or spec over budget | Check `Depends on` issues and the spec's ⛔ comment |
 | Parallel stories queue in CI | Runner `capacity` below 4 × `MAX_AGENTS` | Raise `capacity` in `runner/config.yaml` |
 | Disk filling up | Deployed images are never pruned | Remove old `forge-app/*` images |

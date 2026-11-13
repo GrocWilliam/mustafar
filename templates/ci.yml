@@ -7,6 +7,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # Build once for the 6 shards, before `make test` can touch the tree: they unpack this instead of each running
+      # `npm ci` and the build. tests/acceptance stays out, so the shards run it from their own fresh checkout.
+      - name: build for the acceptance shards
+        shell: bash
+        run: |
+          if make -n build >/dev/null 2>&1; then
+            make build
+            tar --exclude=./.git --exclude=./tests/acceptance -cf /tmp/workspace.tar .
+          fi
+      - uses: actions/upload-artifact@v3
+        with:
+          name: workspace
+          path: /tmp/workspace.tar
+          if-no-files-found: ignore
+          retention-days: 1
       - run: make test
   # Run from here, not from the dev's Makefile, so the dev cannot drop them from CI; in a job of its own, from a fresh
   # checkout, so `make test` cannot rewrite them on disk before they run.
@@ -20,6 +35,11 @@ jobs:
         shard: [0, 1, 2, 3, 4, 5] # scripts split round-robin across 6 parallel jobs; also in the loop below
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v3
+        continue-on-error: true # no build step in this project: nothing was uploaded
+        with:
+          name: workspace
+          path: /tmp/workspace
       - name: acceptance tests (frozen, written by the tester agent)
         shell: bash
         run: |
@@ -32,11 +52,29 @@ jobs:
             scripts+=("$script")
           done
           [ ${#scripts[@]} -gt 0 ] || exit 0
-          # Build once for every script of this shard; scripts skip their own build when FORGE_PREBUILT is set.
-          if make -n build >/dev/null 2>&1; then make build; export FORGE_PREBUILT=1; fi
+          # The test job's build (scripts skip their own build when FORGE_PREBUILT is set), else build here.
+          if [ -f /tmp/workspace/workspace.tar ]; then
+            tar -xf /tmp/workspace/workspace.tar && export FORGE_PREBUILT=1
+          elif make -n build >/dev/null 2>&1; then
+            make build && export FORGE_PREBUILT=1
+          fi
+          # One Chromium for the whole shard: the CI image's playwright-core connects to it instead of launching one per
+          # script (each script still gets fresh contexts).
+          if [ -d /opt/playwright-shared ]; then
+            node -e "require('$PLAYWRIGHT_DIR/node_modules/playwright-core').chromium.launchServer({executablePath: process.env.CHROMIUM_PATH}).then((s) => console.log(s.wsEndpoint()))" >/tmp/pw-ws 2>/dev/null &
+            for _ in $(seq 60); do [ -s /tmp/pw-ws ] && break; sleep 0.5; done
+            [ -s /tmp/pw-ws ] && export PW_WS_ENDPOINT="$(head -1 /tmp/pw-ws)" PLAYWRIGHT_DIR=/opt/playwright-shared
+          fi
+          # A newer commit on the pull request makes this run's result unread: stop, and free the runner for that one.
+          superseded() {
+            local head
+            head=$(git ls-remote origin "refs/heads/${{ github.head_ref }}" | cut -f1)
+            [ -n "$head" ] && [ "$head" != "${{ github.event.pull_request.head.sha }}" ]
+          }
           # Run every script even after a failure, so one run reports every broken test, not one per shard.
           failed=()
           for script in "${scripts[@]}"; do
+            superseded && { echo "superseded by a newer commit on ${{ github.head_ref }}: stopping"; exit 1; }
             echo "== $script"
             bash "$script" || failed+=("$script")
           done

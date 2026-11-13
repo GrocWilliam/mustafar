@@ -33,7 +33,9 @@ chase rules nobody asked for. Name these tests after the criterion too (`rejects
 
 Set up data through the public API, not the database. Browser tests:
 `createRequire(process.env.PLAYWRIGHT_DIR + '/')('playwright-core')` and
-`chromium.launch({ executablePath: process.env.CHROMIUM_PATH })`; never install browsers. Select by `data-testid`
+`chromium.launch({ executablePath: process.env.CHROMIUM_PATH })`; never install browsers. In CI that call connects to one
+browser shared by the shard's scripts: close it at the end as usual, use a new context per test, and pass no launch `args`
+(they start a browser of their own). Select by `data-testid`
 and roles, never by CSS classes (Tailwind classes change). At least one test per acceptance criterion, named after it; check
 every language the app ships when the story shows text.
 

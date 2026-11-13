@@ -109,7 +109,7 @@ Decisions so far:
   - the tester changed only `tests/acceptance/`, and wrote something in `tests/acceptance/us-{n}/`. It may update earlier stories' tests when this story changes the behavior they pin down (otherwise merged tests could never evolve: a story adding a language broke an earlier exact-output test). Such updates are announced in a 🧪 comment, and the reviewer must reject any that the story does not require;
   - the dev changed no acceptance test: every file the tester wrote or rewrote is identical to the tester's commit, and every other file under `tests/acceptance/` matches either the tester's commit or the current `main` (a merge of `main` brings in other stories' tests);
   - nothing under `PROTECTED_PATHS` (default `.gitea/`) differs from both the original base and the current `main`;
-  - CI is `success` (30 min timeout);
+  - CI is `success` (90 min timeout);
   - the reviewer did not push, and its final message ends with `VERDICT: approve`;
   - the merge names the checked head commit: Gitea refuses it if the branch moved since.
 - A failed check, red CI or `VERDICT: changes` becomes feedback for the next `dev` attempt (env `FEEDBACK`, appended to its prompt); red CI feedback carries the end of the failed jobs' logs, read from Gitea's web log route since its 1.22 API has none. After 3 attempts, or on an infrastructure error, the US goes to `us-blocked`.

@@ -9,3 +9,7 @@ ENV CHROMIUM_PATH=/usr/bin/chromium
 # playwright-core preinstalled, so acceptance tests load it from here instead of installing it on every run. Read-only use.
 RUN mkdir /opt/playwright && cd /opt/playwright && npm init -y >/dev/null && npm i playwright-core@1.64.1 && chmod -R a-w /opt/playwright
 ENV PLAYWRIGHT_DIR=/opt/playwright
+# The same package, whose chromium.launch() reuses one browser per CI shard: ci.yml points PLAYWRIGHT_DIR here.
+COPY playwright-shared.cjs /opt/playwright-shared/node_modules/playwright-core/index.js
+RUN echo '{"name":"playwright-core","main":"index.js"}' > /opt/playwright-shared/node_modules/playwright-core/package.json \
+ && chmod -R a-w /opt/playwright-shared
