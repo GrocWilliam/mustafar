@@ -7,21 +7,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      # Build once for the 6 shards, before `make test` can touch the tree: they unpack this instead of each running
-      # `npm ci` and the build. tests/acceptance stays out, so the shards run it from their own fresh checkout.
-      - name: build for the acceptance shards
-        shell: bash
-        run: |
-          if make -n build >/dev/null 2>&1; then
-            make build
-            tar --exclude=./.git --exclude=./tests/acceptance -cf /tmp/workspace.tar .
-          fi
-      - uses: actions/upload-artifact@v3
-        with:
-          name: workspace
-          path: /tmp/workspace.tar
-          if-no-files-found: ignore
-          retention-days: 1
       - run: make test
   # Run from here, not from the dev's Makefile, so the dev cannot drop them from CI; in a job of its own, from a fresh
   # checkout, so `make test` cannot rewrite them on disk before they run.
@@ -34,12 +19,9 @@ jobs:
       matrix:
         shard: [0, 1, 2, 3, 4, 5] # scripts split round-robin across 6 parallel jobs; also in the loop below
     steps:
+      # Only actions/checkout: the runner shares one copy of each action between jobs, and 6 shards fetching another
+      # one at once corrupt it (no artifact actions here for that reason).
       - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v3
-        continue-on-error: true # no build step in this project: nothing was uploaded
-        with:
-          name: workspace
-          path: /tmp/workspace
       - name: acceptance tests (frozen, written by the tester agent)
         shell: bash
         run: |
@@ -52,12 +34,10 @@ jobs:
             scripts+=("$script")
           done
           [ ${#scripts[@]} -gt 0 ] || exit 0
-          # The test job's build (scripts skip their own build when FORGE_PREBUILT is set), else build here.
-          if [ -f /tmp/workspace/workspace.tar ]; then
-            tar -xf /tmp/workspace/workspace.tar && export FORGE_PREBUILT=1
-          elif make -n build >/dev/null 2>&1; then
-            make build && export FORGE_PREBUILT=1
-          fi
+          # Build once for every script of this shard; scripts skip their own build when FORGE_PREBUILT is set.
+          if make -n build >/dev/null 2>&1; then make build; export FORGE_PREBUILT=1; fi
+          # fetch() refuses port 10080 ("bad port"): hold it, so the scripts' random free-port pickers skip it.
+          node -e "require('net').createServer().listen(10080)" >/dev/null 2>&1 &
           # One Chromium for the whole shard: the CI image's playwright-core connects to it instead of launching one per
           # script (each script still gets fresh contexts).
           if [ -d /opt/playwright-shared ]; then
