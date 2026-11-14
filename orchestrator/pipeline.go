@@ -11,7 +11,7 @@ import (
 
 const (
 	maxAttempts   = 3
-	maxRevisions  = 3 // tester revisions per story: a story that moves things can break several earlier tests in turn
+	maxRevisions  = 3                // tester revisions per story: a story that moves things can break several earlier tests in turn
 	ciTimeout     = 90 * time.Minute // a busy runner queues jobs: a story waits for its 7 jobs behind other stories' ones
 	acceptanceDir = "tests/acceptance/"
 	// supportDir holds the acceptance tests' shared domain layer (page objects, API setup): not frozen, so a UI change
@@ -141,15 +141,11 @@ func (o *project) attempt(is issue, branch string, c *contract, feedback string,
 	}
 	if skipDev {
 		// Gitea never reruns CI on an unchanged commit: a retry after a flaky failure needs a new head to get a fresh run.
-		if conflict, err := o.freshCI(is, branch, pr); err != nil {
+		if conflictAt, err := o.freshCI(is, branch, pr); err != nil {
 			return "", err
-		} else if conflict {
-			head0, err := o.gitea.branchHead(branch)
-			if err != nil {
-				return "", err
-			}
+		} else if conflictAt != "" {
 			// Without this the dev gets the stale CI failure, finds nothing to fix, and spends every attempt on it.
-			return retry(fmt.Sprintf("CI had failed on this branch, and `%s` has moved since: it conflicts with your branch, so no fresh CI run could start. Merge `origin/%s` into your branch, resolve the conflicts so both sides keep working, run the tests and commit.%s", is.base, is.base, o.ciLog(head0)))
+			return retry(fmt.Sprintf("CI had failed on this branch, and `%s` has moved since: it conflicts with your branch, so no fresh CI run could start. Merge `origin/%s` into your branch, resolve the conflicts so both sides keep working, run the tests and commit.%s", is.base, is.base, o.ciLog(conflictAt)))
 		}
 	}
 	head, err := o.gitea.branchHead(branch)
@@ -330,26 +326,26 @@ func (o *project) waitCI(sha string) (string, error) {
 
 // freshCI merges the base branch into a resumed branch whose last CI failed, so CI runs again on the new merge commit.
 // It does nothing when CI did not fail or the branch already contains the base: the dev then gets the failure.
-// It reports a conflict when the target cannot be merged in: the dev has to merge it.
-func (o *project) freshCI(is issue, branch string, pr *pullRequest) (conflict bool, err error) {
+// On a conflict it returns the branch head, whose CI failed: the dev has to merge the target.
+func (o *project) freshCI(is issue, branch string, pr *pullRequest) (conflictAt string, err error) {
 	head, err := o.gitea.branchHead(branch)
 	if err != nil {
-		return false, err
+		return "", err
 	}
 	if state, err := o.gitea.ciState(head); err != nil || (state != "failure" && state != "error") {
-		return false, err
+		return "", err
 	}
 	behind, err := o.gitea.behind(branch, is.base)
 	if err != nil || behind == 0 {
-		return false, err
+		return "", err
 	}
 	if err := o.gitea.updatePR(pr.Number); errors.Is(err, errConflict) {
-		return true, nil
+		return head, nil
 	} else if err != nil {
-		return false, err
+		return "", err
 	}
 	_, err = o.gitea.comment(is.Number, fmt.Sprintf("🔄 CI had failed on the resumed branch: merged `%s` into it for a fresh CI run.", is.base))
-	return false, err
+	return "", err
 }
 
 // ciLog is the end of the failed CI jobs' logs on sha, as feedback for the dev; empty if Gitea cannot give it.

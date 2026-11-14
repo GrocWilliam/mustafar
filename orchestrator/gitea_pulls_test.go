@@ -48,7 +48,7 @@ func TestFailedCILog(t *testing.T) {
 
 // A resumed branch whose CI failed and that conflicts with its target must be reported, not left with the stale failure.
 func TestFreshCIConflict(t *testing.T) {
-	update := http.StatusConflict
+	update, comments := http.StatusConflict, 0
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/api/v1/repos/o/r/branches/agent/us-5":
@@ -60,6 +60,7 @@ func TestFreshCIConflict(t *testing.T) {
 		case "/api/v1/repos/o/r/pulls/9/update":
 			w.WriteHeader(update)
 		case "/api/v1/repos/o/r/issues/5/comments":
+			comments++
 			fmt.Fprint(w, `{"id":1}`)
 		default:
 			http.NotFound(w, r)
@@ -69,11 +70,12 @@ func TestFreshCIConflict(t *testing.T) {
 
 	o := &project{gitea: newGitea(config{GiteaURL: srv.URL, GiteaToken: "t"}, "/repos/o/r")}
 	is := issue{Number: 5, base: "spec/1"}
-	if conflict, err := o.freshCI(is, "agent/us-5", &pullRequest{Number: 9}); err != nil || !conflict {
-		t.Errorf("conflict: got %v, %v; want true, nil", conflict, err)
+	// A conflict claims no fresh CI run on the issue.
+	if at, err := o.freshCI(is, "agent/us-5", &pullRequest{Number: 9}); err != nil || at != "abc" || comments != 0 {
+		t.Errorf("conflict: got %q, %v, %d comments; want abc, nil, 0", at, err, comments)
 	}
 	update = http.StatusOK
-	if conflict, err := o.freshCI(is, "agent/us-5", &pullRequest{Number: 9}); err != nil || conflict {
-		t.Errorf("merged: got %v, %v; want false, nil", conflict, err)
+	if at, err := o.freshCI(is, "agent/us-5", &pullRequest{Number: 9}); err != nil || at != "" || comments != 1 {
+		t.Errorf("merged: got %q, %v, %d comments; want \"\", nil, 1", at, err, comments)
 	}
 }
