@@ -40,8 +40,8 @@ users), the error shape, TypeScript strict. The forge's defaults, which its agen
 v4, Drizzle ORM on PostgreSQL with PGlite when `DATABASE_URL` is unset, Zod at every trust boundary, Node's test runner
 and Playwright for acceptance tests. Departing from them is allowed, but say what it costs.
 
-Forge constraints to state, not ask: CI and agents run Debian bookworm with Node 26, Python 3, make, git and Chromium,
-and no Docker in tests, so the database runs embedded (PGlite, SQLite) and `make test` installs anything else. A
+Forge constraints to state, not ask: CI and agents run Debian bookworm with Node 26, Bun, Go, PostgreSQL 16 server binaries (`initdb`, `pg_ctl`, `psql` on PATH), Python 3, make, git and Chromium,
+and no Docker in tests, so the database runs embedded (PGlite, SQLite) or as a throwaway PostgreSQL the test starts with `initdb` + `pg_ctl` in a temp dir, and `make test` installs anything else. A
 service listens on `$PORT` (8080) and answers `GET /health` with 200, so it gets a `Dockerfile` and a staging deploy.
 External services (mail, payment, storage) need a fake in tests: decide which.
 

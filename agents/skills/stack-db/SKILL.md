@@ -61,3 +61,18 @@ import { Pool } from 'pg';
 Unit tests run against a fresh in-memory PGlite with the migrations applied (no mocks of the database). Then build,
 start the app with `PGLITE_DATA_DIR=memory://` and check `/health`: a broken migration fails it, and the forge reverts
 the deployment.
+
+## Real PostgreSQL in tests
+
+When PGlite is not enough (another process such as a Go service shares the database, or the project uses extensions or
+`LISTEN`), start a throwaway server: the image has the PostgreSQL 16 binaries on `PATH`, usable as the node user.
+
+```sh
+d=$(mktemp -d); port=$(node -e "const s=require('net').createServer().listen(0,()=>{console.log(s.address().port);s.close()})")
+initdb -D "$d/data" -U postgres -A trust >/dev/null
+pg_ctl -D "$d/data" -o "-k $d -p $port -c listen_addresses=localhost -c fsync=off" -l "$d/log" -w start >/dev/null
+export DATABASE_URL="postgres://postgres@localhost:$port/postgres"
+# ... tests ...; on exit: pg_ctl -D "$d/data" -m immediate stop; rm -rf "$d"
+```
+
+One server per test run (or per acceptance script), a fresh database per test file (`CREATE DATABASE t_<random>`).
