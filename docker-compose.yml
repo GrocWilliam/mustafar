@@ -5,6 +5,8 @@ services:
       - USER_UID=1000
       - USER_GID=1000
       - GITEA__database__DB_TYPE=sqlite3
+      # WAL: reads go on while CI writes logs and every API call writes its token's last use; the default journal locks them all out.
+      - GITEA__database__SQLITE_JOURNAL_MODE=WAL
       # One URL for everyone: CI job containers resolve `gitea` on the network, the host via /etc/hosts.
       - GITEA__server__ROOT_URL=http://gitea:3000/
       - GITEA__server__SSH_DOMAIN=gitea
