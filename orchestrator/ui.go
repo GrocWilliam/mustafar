@@ -237,6 +237,27 @@ func (f *forge) readyProject(name string) *project {
 	return nil
 }
 
+// stateTTL is how long /api/state reuses its last answer: every open tab polls it, each answer costs Gitea dozens of
+// calls, and Gitea's SQLite slows down for everyone under that load. Below the page's 5 s refresh.
+const stateTTL = 4 * time.Second
+
+type stateCache struct {
+	mu sync.Mutex // held while computing, so tabs polling together wait for one answer
+	at time.Time
+	s  uiState
+}
+
+// cachedState is state, reused for stateTTL unless fresh (the page asks for it after an action).
+func (f *forge) cachedState(fresh bool) uiState {
+	c := &f.uiState
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if fresh || time.Since(c.at) >= stateTTL {
+		c.s, c.at = f.state(), time.Now()
+	}
+	return c.s
+}
+
 func (f *forge) state() uiState {
 	f.mu.Lock()
 	s := uiState{Settings: f.live, Defaults: f.cfg.Defaults, Running: []string{}, Projects: []uiProject{}, Adoptable: []string{}}
@@ -354,8 +375,8 @@ func (f *forge) serveUI() {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.Write(uiPage)
 	})
-	http.HandleFunc("GET /api/state", func(w http.ResponseWriter, _ *http.Request) {
-		writeJSON(w, http.StatusOK, f.state())
+	http.HandleFunc("GET /api/state", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusOK, f.cachedState(r.URL.Query().Has("fresh")))
 	})
 	http.HandleFunc("POST /api/retry", f.action(f.retry))
 	http.HandleFunc("POST /api/budget", f.action(f.setBudget))

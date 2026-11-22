@@ -29,6 +29,7 @@ type forge struct {
 	running  map[string]bool
 	activity map[string]*agentActivity
 	comments commentCache // for the UI
+	uiState  stateCache
 }
 
 func main() {

@@ -1,11 +1,16 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"log"
+	"net"
 	"strings"
 	"sync"
 )
+
+// maxRequeues is how many times a Gitea timeout puts a US back in the queue before it blocks it like any error.
+const maxRequeues = 3
 
 // project is one repository the forge works on. It embeds the forge for the shared config, Docker and agent slots.
 type project struct {
@@ -18,6 +23,9 @@ type project struct {
 	base   string // the repository's default branch, read on setup
 	// merging serializes this project's merges, so each one is checked against the latest state of its target branch.
 	merging sync.Mutex
+	// requeues counts, per US, the pipelines a Gitea timeout cut short since the orchestrator started.
+	requeueMu sync.Mutex
+	requeues  map[int]int
 }
 
 func newProject(f *forge, repo repoInfo) *project {
@@ -116,11 +124,33 @@ func (o *project) handle(is issue) error {
 	}
 	label = "us-in-progress"
 	if err := o.deliver(is, &label); err != nil {
+		// A busy Gitea answers late, not wrongly: the next pickup resumes the branch and reuses its pull request.
+		if isTimeout(err) && o.requeue(is.Number) {
+			log.Printf("%s: US #%d back in the queue after a Gitea timeout: %v", o.name, is.Number, err)
+			return o.gitea.move(is.Number, label, "us-todo")
+		}
 		log.Printf("%s: US #%d blocked: %v", o.name, is.Number, err)
 		return o.block(is.Number, label, err.Error())
 	}
 	log.Printf("%s: US #%d merged", o.name, is.Number)
 	return nil
+}
+
+// isTimeout reports whether err is a request that got no answer in time.
+func isTimeout(err error) bool {
+	var ne net.Error
+	return errors.As(err, &ne) && ne.Timeout()
+}
+
+// requeue counts one more timeout for US number, and reports whether it may go back to the queue.
+func (o *project) requeue(number int) bool {
+	o.requeueMu.Lock()
+	defer o.requeueMu.Unlock()
+	if o.requeues == nil {
+		o.requeues = map[int]int{}
+	}
+	o.requeues[number]++
+	return o.requeues[number] <= maxRequeues
 }
 
 func (o *project) block(number int, from, reason string) error {

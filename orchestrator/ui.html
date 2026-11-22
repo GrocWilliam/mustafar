@@ -327,10 +327,12 @@ window.addEventListener("hashchange", () => { document.activeElement?.blur(); re
 new ResizeObserver(() => document.documentElement.style.setProperty("--head-h", document.querySelector("header").offsetHeight + "px"))
   .observe(document.querySelector("header"));
 
-async function refresh() {
+// fresh skips the server's few-second cache, after an action. A hidden tab does not poll: it refreshes when shown.
+async function refresh(fresh) {
+  if (document.hidden) return;
   const conn = document.getElementById("conn");
   try {
-    const r = await fetch("/api/state", { cache: "no-store" });
+    const r = await fetch(fresh ? "/api/state?fresh=1" : "/api/state", { cache: "no-store" });
     if (!r.ok) throw new Error(r.status);
     state = await r.json();
     conn.innerHTML = `<span class="dot"></span><span>orchestrator up</span>`;
@@ -360,7 +362,7 @@ async function act(path, body, button) {
     return false;
   } finally {
     if (button) button.disabled = false;
-    refresh();
+    refresh(true);
   }
 }
 
@@ -434,6 +436,7 @@ app.addEventListener("toggle", (e) => {
 setInterval(() => document.querySelectorAll("[data-since]").forEach((el) => (el.textContent = elapsed(el.dataset.since))), 1000);
 refresh();
 setInterval(refresh, REFRESH_MS);
+document.addEventListener("visibilitychange", () => refresh());
 </script>
 </body>
 </html>
