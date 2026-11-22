@@ -79,3 +79,25 @@ func TestFreshCIConflict(t *testing.T) {
 		t.Errorf("merged: got %q, %v, %d comments; want \"\", nil, 1", at, err, comments)
 	}
 }
+
+// A failure far above the tail (the CI job runs every script after one fails) is quoted ahead of it, under its script.
+func TestTailBeforeExitQuotesFailures(t *testing.T) {
+	var b strings.Builder
+	b.WriteString("== tests/acceptance/us-7/run.sh\n(pass) pages\nerror: expect(received).toBe(expected)\nExpected: \"east\"\nReceived: undefined\n(fail) server selector [382ms]\n")
+	for i := 0; i < 100; i++ {
+		fmt.Fprintf(&b, "(pass) later test %d\n", i)
+	}
+	b.WriteString("FAILED: tests/acceptance/us-7/run.sh\nexitcode '1': failure\n")
+	got := tailBeforeExit(b.String(), 5)
+	for _, want := range []string{"Failures:\n== tests/acceptance/us-7/run.sh\n", "Received: undefined\n(fail) server selector", "End of the log:\n", "FAILED: tests/acceptance/us-7/run.sh"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("missing %q in:\n%s", want, got)
+		}
+	}
+	if strings.Count(got, "== tests/acceptance/us-7/run.sh") != 1 || strings.Contains(got, "later test 3\n") {
+		t.Errorf("header once, no unrelated lines:\n%s", got)
+	}
+	if got := tailBeforeExit("(pass) a\n(fail) b\nexitcode '1'", 60); strings.Contains(got, "Failures:") {
+		t.Errorf("a failure already in the tail is not quoted twice: %q", got)
+	}
+}

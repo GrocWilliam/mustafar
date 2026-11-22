@@ -7,6 +7,7 @@ import (
 	"maps"
 	"net/http"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 )
@@ -111,14 +112,48 @@ func (g *gitea) failedCILog(sha string, lines int) (string, error) {
 	return out.String(), nil
 }
 
+// failContext is how many lines before a bun `(fail)` line hold its error (`error:`, Expected, Received, the source
+// line); maxFailLines caps the failures quoted ahead of the tail.
+const (
+	failContext  = 12
+	maxFailLines = 120
+)
+
 // tailBeforeExit cleans a job log and keeps its last lines before the runner's `exitcode` line (the post-step noise).
+// The CI job runs every script even after one fails, so a failure is usually far above the tail: each failing test's
+// lines, under its script's `==` header, come first.
 func tailBeforeExit(log string, lines int) string {
 	log = ansi.ReplaceAllString(logStamp.ReplaceAllString(log, ""), "")
 	if i := strings.Index(log, "exitcode '"); i >= 0 {
 		log = log[:i]
 	}
 	all := strings.Split(strings.TrimRight(log, "\n"), "\n")
-	return strings.Join(all[max(0, len(all)-lines):], "\n")
+	start := max(0, len(all)-lines)
+	tail := strings.Join(all[start:], "\n")
+	var fails []string
+	header, next := "", 0 // next: the first line not quoted yet
+	for i, line := range all[:start] {
+		if strings.HasPrefix(line, "== ") {
+			header = line
+		}
+		if !strings.HasPrefix(line, "(fail) ") {
+			continue
+		}
+		from := max(next, i-failContext)
+		if header != "" && !slices.Contains(all[from:i], header) {
+			fails = append(fails, header)
+		}
+		header = ""
+		fails = append(fails, all[from:i+1]...)
+		next = i + 1
+	}
+	if len(fails) == 0 {
+		return tail
+	}
+	if len(fails) > maxFailLines {
+		fails = append(fails[:maxFailLines], "[more failures cut]")
+	}
+	return "Failures:\n" + strings.Join(fails, "\n") + "\n\nEnd of the log:\n" + tail
 }
 
 // merge squash-merges pr, only if its branch is still at head: what was checked is what gets merged.
