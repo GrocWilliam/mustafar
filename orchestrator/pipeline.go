@@ -93,8 +93,11 @@ func (o *project) deliver(is issue, label *string) error {
 // An error means the US cannot go on (infrastructure failure or misbehaving agent).
 func (o *project) attempt(is issue, branch string, c *contract, feedback string, label *string, skipDev bool) (string, error) {
 	// The next dev run starts a fresh session: what this one said it did and left undone spares it re-exploring.
-	summary := ""
+	summary, kept := "", ""
 	retry := func(msg string) (string, error) {
+		if kept != "" {
+			msg += "\n\nThe tester checked the test conflicts you reported and kept the tests: make the code pass them. Its answer:\n\n" + kept
+		}
 		if summary != "" {
 			msg += "\n\nYour previous run ended with:\n\n" + summary
 		}
@@ -121,7 +124,8 @@ func (o *project) attempt(is issue, branch string, c *contract, feedback string,
 				report = "The dev added no commit after this CI failure: it could not make the tests pass. Check whether the failing tests contradict the story, pin what an earlier story defined that this one changes, or are flaky.\n\n" +
 					clip(feedback, 8000) + "\n\nThe dev's summary:\n\n" + summary
 			}
-			if rejected, err := o.revise(is, branch, c, report); err != nil {
+			var rejected string
+			if rejected, kept, err = o.revise(is, branch, c, report); err != nil {
 				return "", err
 			} else if rejected != "" {
 				return rejected, nil
@@ -244,41 +248,42 @@ func (o *project) test(is issue, branch string, c *contract) error {
 }
 
 // revise runs the tester again on the tests the dev reported as conflicting or could not make pass (report: why). The checks
-// then hold the dev to the revised tests. It returns the dev's feedback when the revision cannot go ahead or the
-// tester kept the tests, "" to go on with the checks.
-func (o *project) revise(is issue, branch string, c *contract, report string) (string, error) {
+// then hold the dev to the revised tests. It returns the dev's feedback when the revision cannot go ahead, or else "" to
+// go on with the checks, with the tester's answer when it kept the tests: code that passes them merges, and the answer
+// goes to the dev only if the checks reject it.
+func (o *project) revise(is issue, branch string, c *contract, report string) (rejected, kept string, err error) {
 	before, err := o.treeOf(branch)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	targetTree, err := o.treeOf(is.base)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	// The revision would adopt the dev's own edits of the tests as the tester's.
 	if touched := frozen(c.base, c.tests, targetTree, before); len(touched) > 0 {
-		return "You modified frozen acceptance tests: " + list(touched) + ". Restore them exactly as committed by the tester; report a conflict with a `TEST CONFLICT:` line instead of editing the test.", nil
+		return "You modified frozen acceptance tests: " + list(touched) + ". Restore them exactly as committed by the tester; report a conflict with a `TEST CONFLICT:` line instead of editing the test.", "", nil
 	}
 	c.revisions++ // counted whatever the tester decides
 	ok, final, err := o.runAgent("retester", is, report)
 	if err != nil || !ok {
-		return "", agentFailure("retester", err)
+		return "", "", agentFailure("retester", err)
 	}
 	after, err := o.treeOf(branch)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	if stray := outside(changed(before, after, ""), acceptanceDir); len(stray) > 0 {
-		return "", fmt.Errorf("the tester's revision changed files outside `%s`: %s", acceptanceDir, list(stray))
+		return "", "", fmt.Errorf("the tester's revision changed files outside `%s`: %s", acceptanceDir, list(stray))
 	}
 	revised := changed(before, after, acceptanceDir)
 	if len(revised) == 0 {
-		return "The tester checked the test conflicts you reported and kept the tests: fix the code. Its answer:\n\n" + clip(strings.TrimSpace(final), 3000), nil
+		return "", clip(strings.TrimSpace(final), 3000), nil
 	}
 	c.tests = after
 	msg := "🧪 The dev reported a test conflict: the tester revised " + list(revised) + ". The reviewer checks that the story requires it."
 	_, err = o.gitea.comment(is.Number, msg)
-	return "", err
+	return "", "", err
 }
 
 // ensurePR returns the branch's pull request, opening it on the first attempt.
