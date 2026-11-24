@@ -98,8 +98,9 @@ func TestByPriority(t *testing.T) {
 		is := issue{Number: n}
 		for _, l := range labels {
 			is.Labels = append(is.Labels, struct {
+				ID   int64  `json:"id"`
 				Name string `json:"name"`
-			}{l})
+			}{Name: l})
 		}
 		return is
 	}

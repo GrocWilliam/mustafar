@@ -24,6 +24,7 @@ type issue struct {
 	Body   string `json:"body"`
 	State  string `json:"state"`
 	Labels []struct {
+		ID   int64  `json:"id"`
 		Name string `json:"name"`
 	} `json:"labels"`
 	base string // the branch a story builds on and merges into, set when its pipeline starts
@@ -93,11 +94,19 @@ func (g *gitea) issuesWith(label string) ([]issue, error) {
 }
 
 // move swaps one lifecycle label for another, keeping the issue's other labels.
+// move swaps label from for to in one write: a DELETE then POST that timed out between them left issues with no lifecycle label, never picked up again.
 func (g *gitea) move(number int, from, to string) error {
-	if err := g.call("DELETE", fmt.Sprintf("/issues/%d/labels/%d", number, g.labelIDs[from]), nil, nil); err != nil {
+	is, err := g.getIssue(number)
+	if err != nil {
 		return err
 	}
-	return g.label(number, to)
+	ids := []int64{g.labelIDs[to]}
+	for _, l := range is.Labels {
+		if l.Name != from && l.Name != to {
+			ids = append(ids, l.ID)
+		}
+	}
+	return g.call("PUT", fmt.Sprintf("/issues/%d/labels", number), map[string][]int64{"labels": ids}, nil)
 }
 
 func (g *gitea) label(number int, name string) error {

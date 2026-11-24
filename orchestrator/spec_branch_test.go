@@ -126,7 +126,7 @@ func TestLandSpecConflictSendsIntegratorThenBlocks(t *testing.T) {
 	if slices.Contains(f.calls, "POST /pulls/9/merge") || slices.Contains(f.calls, "PATCH /issues/3") || slices.Contains(f.calls, "DELETE /branches/spec/3") {
 		t.Fatalf("a conflicting spec landed: %q", f.calls)
 	}
-	if !slices.Contains(f.calls, "POST /issues/3/labels") {
+	if !slices.Contains(f.calls, "PUT /issues/3/labels") {
 		t.Fatalf("not blocked: %q", f.calls)
 	}
 }

@@ -1,9 +1,11 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -99,5 +101,28 @@ func TestTailBeforeExitQuotesFailures(t *testing.T) {
 	}
 	if got := tailBeforeExit("(pass) a\n(fail) b\nexitcode '1'", 60); strings.Contains(got, "Failures:") {
 		t.Errorf("a failure already in the tail is not quoted twice: %q", got)
+	}
+}
+
+// move swaps one label for another in a single PUT that keeps the issue's other labels.
+func TestMoveSwapsLabelsInOneWrite(t *testing.T) {
+	var put map[string][]int64
+	f := &fakes{routes: map[string]func(http.ResponseWriter){
+		"GET /issues/7": reply(map[string]any{"labels": []map[string]any{{"id": 1, "name": "us-review"}, {"id": 2, "name": "priority"}}}),
+	}}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "PUT" {
+			json.NewDecoder(r.Body).Decode(&put)
+		}
+		f.ServeHTTP(w, r)
+	}))
+	defer srv.Close()
+	g := newGitea(config{GiteaURL: srv.URL, GiteaToken: "t"}, "/repos/o/r")
+	g.labelIDs = map[string]int64{"us-review": 1, "priority": 2, "us-todo": 3}
+	if err := g.move(7, "us-review", "us-todo"); err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(f.calls, []string{"GET /issues/7", "PUT /issues/7/labels"}) || !slices.Equal(put["labels"], []int64{3, 2}) {
+		t.Fatalf("calls %q, labels %v", f.calls, put["labels"])
 	}
 }
