@@ -90,7 +90,11 @@ func (g *gitea) unprotect(branch string) error {
 // ensureBranch creates branch from another one, unless it exists: two stories of a spec may start together.
 func (g *gitea) ensureBranch(branch, from string) error {
 	err := g.call("POST", "/branches", map[string]string{"new_branch_name": branch, "old_branch_name": from}, nil)
-	if hasStatus(err, http.StatusConflict) {
+	if err == nil || hasStatus(err, http.StatusConflict) {
+		return nil
+	}
+	// Two creates at the same instant both pass Gitea's 409 check; the loser fails its push with a 500.
+	if _, headErr := g.branchHead(branch); headErr == nil {
 		return nil
 	}
 	return err

@@ -126,3 +126,20 @@ func TestMoveSwapsLabelsInOneWrite(t *testing.T) {
 		t.Fatalf("calls %q, labels %v", f.calls, put["labels"])
 	}
 }
+
+// A create that loses a race with another one (Gitea answers 500) succeeds when the branch now exists.
+func TestEnsureBranchAcceptsALostRace(t *testing.T) {
+	f := &fakes{routes: map[string]func(http.ResponseWriter){
+		"POST /branches": func(w http.ResponseWriter) { http.Error(w, `{"message":"reference already exists"}`, http.StatusInternalServerError) },
+	}}
+	srv := httptest.NewServer(f)
+	defer srv.Close()
+	g := newGitea(config{GiteaURL: srv.URL, GiteaToken: "t"}, "/repos/o/r")
+	if err := g.ensureBranch("spec/3", "main"); err != nil {
+		t.Fatal(err)
+	}
+	f.routes["GET /branches/spec/3"] = func(w http.ResponseWriter) { http.Error(w, "{}", http.StatusNotFound) }
+	if err := g.ensureBranch("spec/3", "main"); err == nil {
+		t.Fatal("a failed create of a missing branch passed")
+	}
+}
