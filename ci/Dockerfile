@@ -6,8 +6,8 @@ FROM node:26-bookworm
 RUN apt-get update && apt-get install -y --no-install-recommends chromium fonts-dejavu-core \
  && rm -rf /var/lib/apt/lists/*
 ENV CHROMIUM_PATH=/usr/bin/chromium
-# PostgreSQL 16 server binaries (PGDG), for tests against a real database: a test runs `initdb` and `pg_ctl` as the node
-# user in a temporary directory. No cluster is created or started at build time.
+# PostgreSQL 16 server binaries (PGDG), for tests against a real database: a test runs `initdb` and `pg_ctl` in a
+# temporary directory. No cluster is created or started at build time.
 RUN curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc -o /usr/share/keyrings/pgdg.asc \
  && echo "deb [signed-by=/usr/share/keyrings/pgdg.asc] https://apt.postgresql.org/pub/repos/apt bookworm-pgdg main" \
     > /etc/apt/sources.list.d/pgdg.list \
@@ -15,14 +15,17 @@ RUN curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc -o /usr/share/
  && echo 'create_main_cluster = false' > /etc/postgresql-common/createcluster.d/no-main.conf \
  && apt-get update && apt-get install -y --no-install-recommends postgresql-16 \
  && rm -rf /var/lib/apt/lists/*
-ENV PATH=/usr/lib/postgresql/16/bin:$PATH
+# CI jobs run as root, which PostgreSQL refuses: these wrappers run it as node (pg-as-node.sh), like on the agents.
+COPY pg-as-node.sh /usr/local/lib/forge-pg/pg-as-node.sh
+RUN mkdir /usr/local/lib/forge-pg/bin && for c in initdb pg_ctl postgres; do ln -s ../pg-as-node.sh /usr/local/lib/forge-pg/bin/$c; done
+ENV PATH=/usr/local/lib/forge-pg/bin:/usr/lib/postgresql/16/bin:$PATH
 # Go, pinned by version and checksum (go.dev/dl).
 ARG GO_VERSION=1.27.4
 ARG GO_SHA256=7226736c2339719cda28fbf3a54d71aa63bcefe376e98cef00034268dab24840
 RUN curl -fsSL "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" -o /tmp/go.tgz \
  && echo "${GO_SHA256}  /tmp/go.tgz" | sha256sum -c - \
  && tar -C /usr/local -xzf /tmp/go.tgz && rm /tmp/go.tgz
-# GOPATH under the node user's home: agents and CI run as node, which cannot write /usr/local.
+# GOPATH under the node user's home: agents run as node, which cannot write /usr/local.
 ENV PATH=/usr/local/go/bin:/home/node/go/bin:$PATH GOTOOLCHAIN=local
 # Bun, pinned.
 RUN npm install -g bun@1.4.4
