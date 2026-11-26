@@ -104,6 +104,23 @@ func TestTailBeforeExitQuotesFailures(t *testing.T) {
 	}
 }
 
+// A script that dies before its tests prints no `(fail)` line: its first lines are quoted, the passing scripts' are not.
+func TestTailBeforeExitQuotesSilentScripts(t *testing.T) {
+	var b strings.Builder
+	b.WriteString("== tests/acceptance/us-413/run.sh\ninitdb: error: cannot be run as root\ninitdb failed\n== tests/acceptance/us-48/run.sh\n")
+	for i := 0; i < 100; i++ {
+		fmt.Fprintf(&b, "✔ later test %d\n", i)
+	}
+	b.WriteString("FAILED: tests/acceptance/us-413/run.sh\nexitcode '1': failure\n")
+	got := tailBeforeExit(b.String(), 5)
+	if !strings.Contains(got, "Failures:\n== tests/acceptance/us-413/run.sh\ninitdb: error: cannot be run as root\ninitdb failed\n") {
+		t.Errorf("setup error not quoted:\n%s", got)
+	}
+	if strings.Contains(got, "us-48") || strings.Contains(got, "later test 3\n") {
+		t.Errorf("a passing script was quoted:\n%s", got)
+	}
+}
+
 // move swaps one label for another in a single PUT that keeps the issue's other labels.
 func TestMoveSwapsLabelsInOneWrite(t *testing.T) {
 	var put map[string][]int64
@@ -130,7 +147,9 @@ func TestMoveSwapsLabelsInOneWrite(t *testing.T) {
 // A create that loses a race with another one (Gitea answers 500) succeeds when the branch now exists.
 func TestEnsureBranchAcceptsALostRace(t *testing.T) {
 	f := &fakes{routes: map[string]func(http.ResponseWriter){
-		"POST /branches": func(w http.ResponseWriter) { http.Error(w, `{"message":"reference already exists"}`, http.StatusInternalServerError) },
+		"POST /branches": func(w http.ResponseWriter) {
+			http.Error(w, `{"message":"reference already exists"}`, http.StatusInternalServerError)
+		},
 	}}
 	srv := httptest.NewServer(f)
 	defer srv.Close()

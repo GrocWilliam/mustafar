@@ -147,6 +147,7 @@ func tailBeforeExit(log string, lines int) string {
 		fails = append(fails, all[from:i+1]...)
 		next = i + 1
 	}
+	fails = append(fails, silentFailures(all, start)...)
 	if len(fails) == 0 {
 		return tail
 	}
@@ -154,6 +155,36 @@ func tailBeforeExit(log string, lines int) string {
 		fails = append(fails[:maxFailLines], "[more failures cut]")
 	}
 	return "Failures:\n" + strings.Join(fails, "\n") + "\n\nEnd of the log:\n" + tail
+}
+
+// silentFailures quotes the first lines of each script listed as `FAILED:` whose section has no `(fail)` line: a
+// script that dies before its tests (a setup error) or a runner bun does not parse. Sections from line start (the
+// quoted tail) on are skipped.
+func silentFailures(all []string, start int) []string {
+	failed := map[string]bool{}
+	for _, line := range all {
+		if script, ok := strings.CutPrefix(line, "FAILED: "); ok {
+			failed[script] = true
+		}
+	}
+	above := all[:start]
+	var out []string
+	for i, line := range above {
+		script, ok := strings.CutPrefix(line, "== ")
+		if !ok || !failed[script] {
+			continue
+		}
+		end := i + 1
+		for end < len(above) && !strings.HasPrefix(above[end], "== ") && !strings.HasPrefix(above[end], "FAILED: ") {
+			end++
+		}
+		section := above[i:end]
+		if slices.ContainsFunc(section, func(l string) bool { return strings.HasPrefix(l, "(fail) ") }) {
+			continue
+		}
+		out = append(out, section[:min(len(section), failContext+1)]...)
+	}
+	return out
 }
 
 // merge squash-merges pr, only if its branch is still at head: what was checked is what gets merged.
